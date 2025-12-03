@@ -25,6 +25,11 @@ class OpsMaster extends Component {
         }
     }
 
+    componentDidMount() {
+        this.handleClickMenu({ key: "scriptManage" });
+    }
+
+
     handleClickMenu = (item) => {
         console.log(item)
         if (item.key === "dataTable") {
@@ -45,27 +50,22 @@ class OpsMaster extends Component {
         const { enterAction } = this.props;
         console.log(enterAction);
         return (
-            // <div>hello</div>
-            <Layout style={{ minHeight: '100vh' }}>
-                <Sider>
+            <Layout style={{ minHeight: '100vh', background: '#0f172a', border: '1px solid #1e293b' }}>
+                <Sider width={150}>
                     <Menu
                         theme="dark"
                         mode="inline"
-                        defaultSelectedKeys={['2']}
                         items={[
                             { key: 'dataTable', label: FUNC_NAMES.dataTable },
                             { key: 'scriptManage', label: FUNC_NAMES.scriptManage, style: { backgroundColor: '#1890ff' } },
                             { key: 'taskManage', label: FUNC_NAMES.taskManage },
                             { key: 'logManage', label: FUNC_NAMES.logManage },
                         ]}
-                        style={{ flex: 1, minWidth: 0 }}
                         onClick={this.handleClickMenu}
                     >
                     </Menu>
                 </Sider>
-                <Layout>
-                    {this.state.showScriptManage && <ScriptManage></ScriptManage>}
-                </Layout>
+                {this.state.showScriptManage && <ScriptManage></ScriptManage>}
             </Layout>
         );
     }

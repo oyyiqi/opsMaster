@@ -10,7 +10,7 @@
       "code": "opsMaster",
       "explain": "toolManager",
       "cmds": [
-        "ops",
+        "op",
         "opsMaster",
         "toolManager"
       ]
