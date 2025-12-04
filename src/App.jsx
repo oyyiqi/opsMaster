@@ -12,6 +12,7 @@ class App extends Component {
       route: ''
     };
   }
+  
 
   componentDidMount() {
     window.utools.onPluginEnter((action) => {
@@ -29,23 +30,9 @@ class App extends Component {
   render() {
     const { route, enterAction } = this.state;
 
-    if (route === 'opsMaster') {
-      return <OpsMaster enterAction={enterAction} />;
-    }
-
-    if (route === 'hello') {
-      return <Hello enterAction={enterAction} />;
-    }
-
-    if (route === 'read') {
-      return <Read enterAction={enterAction} />;
-    }
-
-    if (route === 'write') {
-      return <Write enterAction={enterAction} />;
-    }
-
-    return false;
+    return (
+      <OpsMaster enterAction={enterAction} />
+    )
   }
 }
 
