@@ -9,10 +9,13 @@ import {
   CloseOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
-import { Button, Tag, Menu, Card, Tooltip, Input } from "antd";
+import { Button, Tag, Menu, Card, Tooltip, Input, message, Popconfirm } from "antd";
 import { Component } from "react";
 import "./index.css";
 import { AddScriptModal } from "./addScriptModal";
+import { SCRIPT_TYPE } from "./const.js";
+
+const SAVED_SCRIPTS_KEY = 'savedScripts';
 
 const BORDER_STYLE = "1px solid #1e293b";
 const { TextArea } = Input;
@@ -23,33 +26,48 @@ export default class ScriptManage extends Component {
       items: [
         {
           key: "CICD_CHECK",
-          name: "CICD检查脚本",
           type: "python",
-          memo: "用于检查CICD流水线配置是否符合规范",
           content: 'print("Hello, World!")',
+          abbreviation: 'PY',
         },
         {
           key: "CICD_CHECK2",
-          name: "CICD检查脚本",
           type: "python",
-          memo: "用于检查CICD流水线配置是否符合规范",
-          content: 'print("Hello, World!")',
+          content: 'print("Hello, World hhh!")',
+          abbreviation: 'PY',
         },
       ],
-      selectedKey: "",
+      selectedItem: {},
+      defaultSelectedKeys: [],
       isReadOnly: true,
       showAddScriptModal: false,
     };
   }
 
-  componentDidMount() {}
+  componentDidMount() {
+    this.loadScripts()
+  }
 
-  getCardTitle = () => {
-    return <div style={{ backgroundColor: "#0f172a" }}>123</div>;
-  };
+  loadScripts = () => {
+    const { items } = this.state;
+    let savedScripts = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
+    if (!savedScripts || savedScripts.length === 0) {
+      return;
+    }
+    this.setState({ defaultSelectedKeys: [savedScripts[0]]});
+    console.log(savedScripts);
+    savedScripts.forEach(element => {
+      let item = window.utools.dbStorage.getItem(element);
+      item.abbreviation = SCRIPT_TYPE.filter((value) => value.type === item.type)[0].abbreviation
+      items.push(item);
+    });
+    this.setState({selectedItem: items[0], items});
+  }
 
   handleClickScriptItem = (item) => {
-    this.setState({ selectedKeys: item.key });
+    const selectedKey = item.key
+    const selectedItem = this.state.items.filter((it) => it.key === selectedKey)[0]
+    this.setState( {selectedItem} );
   };
 
   handleClickEdit = () => {
@@ -73,7 +91,28 @@ export default class ScriptManage extends Component {
     console.log(e.target.value);
   };
 
+  handleClickDelete = () => {
+    let { selectedItem, items } = this.state;
+    if (selectedItem.key === undefined) {
+      message.info('请先选择脚本，再进行删除')
+    } else {
+      items = items.filter((item) => item.key !== selectedItem.key);
+      let savedScripts = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
+      savedScripts = savedScripts.filter((item) => item !== selectedItem.key);
+      window.utools.dbStorage.removeItem(selectedItem.key);
+      window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, savedScripts)
+      this.setState({ items }, () => message.info('删除成功！'));
+    }
+  }
+
+  renderNewScript = (newScript) => {
+    let { items } = this.state;
+    items.push(newScript);
+    this.setState({items}, () => {message.success('导入脚本成功')});
+  }
+
   render() {
+    const {selectedItem} = this.state;
     return (
       <Layout className="script-manage-layout" >
         <Sider width={220}>
@@ -99,6 +138,7 @@ export default class ScriptManage extends Component {
             theme="dark"
             style={{height: '100%'}}
             onClick={this.handleClickScriptItem}
+            defaultSelectedKeys={this.state.defaultSelectedKeys}
           >
             {this.state.items.map((item) => (
               <Menu.Item
@@ -110,7 +150,7 @@ export default class ScriptManage extends Component {
                   alignItems: "center",
                 }}
               >
-                {item.name}
+                {item.key}
                 <Tag className="menuTag">{item.type}</Tag>
               </Menu.Item>
             ))}
@@ -125,8 +165,10 @@ export default class ScriptManage extends Component {
                 alignItems: "center",
               }}
             >
-              <Tag className="titleTag">Py</Tag>
-              <span className="titleSpan">CICD检查脚本</span>
+              <Tag className="titleTag">
+                {selectedItem.abbreviation}
+              </Tag>
+              <span className="titleSpan">{selectedItem.key}</span>
             </div>
             <div>
               <Tooltip title="运行">
@@ -170,14 +212,22 @@ export default class ScriptManage extends Component {
                   ></Button>
                 </Tooltip>
               )}
-              <Tooltip title="删除">
-                <Button
-                  type="primary"
-                  shape="circle"
-                  icon={<DeleteOutlined />}
-                  danger
-                ></Button>
-              </Tooltip>
+              <Popconfirm
+                title={"删除脚本"}
+                description={"确认是否删除该脚本"}
+                onConfirm={this.handleClickDelete}
+                okText={"是"}
+                cancelText={"否"}
+              >
+                <Tooltip title="删除">
+                  <Button
+                    type="primary"
+                    shape="circle"
+                    icon={<DeleteOutlined />}
+                    danger
+                  ></Button>
+                </Tooltip>
+              </Popconfirm>
             </div>
           </Header>
           <Content>
@@ -190,6 +240,7 @@ export default class ScriptManage extends Component {
               }}
               onChange={this.handleTextAreaChange}
               readOnly={this.state.isReadOnly}
+              value={selectedItem.content}
             />
           </Content>
         </Layout>
@@ -198,6 +249,7 @@ export default class ScriptManage extends Component {
             handleAddModalCancel={() =>
               this.setState({ showAddScriptModal: false })
             }
+            renderNewScript={this.renderNewScript}
           ></AddScriptModal>
         )}
       </Layout>

@@ -1,4 +1,4 @@
-import { Modal, Input, Select, Form, Row, Col, Upload, Button } from "antd";
+import { Modal, Input, Select, Form, Row, Col, Upload, Button, message } from "antd";
 import React, { Component } from "react";
 import "./index.css";
 import { Option } from "antd/es/mentions";
@@ -9,25 +9,48 @@ export class AddScriptModal extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      fileList: [],
+      file: '',
       fileContent: "",
     };
     this.formRef = React.createRef();
   }
 
   handleOk = () => {
-    this.formRef.current.validateFields().then((values) => {
-      console.log(values);
-      console.log(this.state.fileList);
-    });
+    const { file, fileContent } = this.state;
+    let scriptName = this.formRef.current.getFieldValue('scriptName')
+    let scriptType = this.formRef.current.getFieldValue('scriptType')
+    if (scriptName === undefined || scriptName.trim().length === 0) {
+      let start = file.lastIndexOf('\\')
+      let end = file.lastIndexOf('.')
+      scriptName = file.substring(start+1, end)
+    }
+    let savedScripts = window.utools.dbStorage.getItem('savedScripts')
+    console.log(savedScripts)
+    if (savedScripts && savedScripts.includes(scriptName)) {
+      message.error("脚本名重复")
+      return
+    } else {
+      let newScript = { 
+        key: scriptName,
+        type: scriptType,
+        content: fileContent,
+        path: file,
+      }
+      window.utools.dbStorage.setItem(scriptName, newScript);
+      savedScripts = savedScripts ? savedScripts : [];
+      savedScripts.push(scriptName);
+      window.utools.dbStorage.setItem('savedScripts', savedScripts);
+      this.props.renderNewScript(newScript);
+    }
   };
 
   handleClickUpload = () => {
     const filters = [{ name: "script", extensions: ["js", "py", "sh", "bat"] }];
     const files = window.utools.showOpenDialog({ filters });
     const file = files[0];
+    console.log(file)
     const fileContent = window.services.readFile(file);
-    this.setState({ fileContent });
+    this.setState({ file, fileContent });
   };
 
   render() {
@@ -59,7 +82,7 @@ export class AddScriptModal extends Component {
             <Col span={12}>
               <Form.Item
                 label="脚本类型"
-                name="scripType"
+                name="scriptType"
                 initialValue={"python"}
               >
                 <Select>

@@ -60,6 +60,7 @@ class OpsMaster extends Component {
               { key: "logManage", label: FUNC_NAMES.logManage },
             ]}
             onClick={this.handleClickMenu}
+            defaultSelectedKeys={['scriptManage']}
           ></Menu>
         </Sider>
         {this.state.showScriptManage && <ScriptManage></ScriptManage>}
