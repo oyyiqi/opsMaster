@@ -45,7 +45,6 @@ class OpsMaster extends Component {
 
   render() {
     const { enterAction } = this.props;
-    console.log(enterAction);
     return (
       <Layout style={{ minHeight: "100vh" }}>
         <Sider width={150}>

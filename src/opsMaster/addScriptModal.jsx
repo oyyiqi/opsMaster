@@ -41,6 +41,7 @@ export class AddScriptModal extends Component {
       savedScripts.push(scriptName);
       window.utools.dbStorage.setItem('savedScripts', savedScripts);
       this.props.renderNewScript(newScript);
+      this.props.handleAddModalCancel();
     }
   };
 

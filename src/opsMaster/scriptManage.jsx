@@ -24,21 +24,20 @@ export default class ScriptManage extends Component {
     super(props);
     this.state = {
       items: [
-        {
-          key: "CICD_CHECK",
-          type: "python",
-          content: 'print("Hello, World!")',
-          abbreviation: 'PY',
-        },
-        {
-          key: "CICD_CHECK2",
-          type: "python",
-          content: 'print("Hello, World hhh!")',
-          abbreviation: 'PY',
-        },
+        // {
+        //   key: "CICD_CHECK",
+        //   type: "python",
+        //   content: 'print("Hello, World!")',
+        //   abbreviation: 'PY',
+        // },
+        // {
+        //   key: "CICD_CHECK2",
+        //   type: "python",
+        //   content: 'print("Hello, World hhh!")',
+        //   abbreviation: 'PY',
+        // },
       ],
       selectedItem: {},
-      defaultSelectedKeys: [],
       isReadOnly: true,
       showAddScriptModal: false,
     };
@@ -54,7 +53,6 @@ export default class ScriptManage extends Component {
     if (!savedScripts || savedScripts.length === 0) {
       return;
     }
-    this.setState({ defaultSelectedKeys: [savedScripts[0]]});
     console.log(savedScripts);
     savedScripts.forEach(element => {
       let item = window.utools.dbStorage.getItem(element);
@@ -100,15 +98,22 @@ export default class ScriptManage extends Component {
       let savedScripts = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
       savedScripts = savedScripts.filter((item) => item !== selectedItem.key);
       window.utools.dbStorage.removeItem(selectedItem.key);
-      window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, savedScripts)
-      this.setState({ items }, () => message.info('删除成功！'));
+      window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, savedScripts);
+      selectedItem = items[0] ? items[0] : {};
+      this.setState({ items, selectedItem }, () => message.info('删除成功！'));
     }
+  }
+
+  handleClickRun = () => {
+    const scriptPath = this.state.selectedItem.path;
+    console.log(scriptPath)
+    window.services.runPythonScript(scriptPath);
   }
 
   renderNewScript = (newScript) => {
     let { items } = this.state;
     items.push(newScript);
-    this.setState({items}, () => {message.success('导入脚本成功')});
+    this.setState({items, selectedItem: newScript}, () => {message.success('导入脚本成功')});
   }
 
   render() {
@@ -138,7 +143,7 @@ export default class ScriptManage extends Component {
             theme="dark"
             style={{height: '100%'}}
             onClick={this.handleClickScriptItem}
-            defaultSelectedKeys={this.state.defaultSelectedKeys}
+            selectedKeys={[selectedItem.key]}
           >
             {this.state.items.map((item) => (
               <Menu.Item
@@ -177,6 +182,7 @@ export default class ScriptManage extends Component {
                   shape="circle"
                   icon={<CaretRightOutlined />}
                   style={{ marginRight: 8 }}
+                  onClick={this.handleClickRun}
                 ></Button>
               </Tooltip>
               {this.state.isReadOnly && (
