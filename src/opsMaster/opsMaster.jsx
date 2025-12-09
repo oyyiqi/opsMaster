@@ -30,7 +30,6 @@ class OpsMaster extends Component {
   }
 
   handleClickMenu = (item) => {
-    console.log(item);
     if (item.key === "dataTable") {
       this.setState({ showScriptManage: true, showTaskManage: false });
     }
@@ -55,10 +54,10 @@ class OpsMaster extends Component {
             mode="inline"
             style={{ height: "100%" }}
             items={[
-              { key: "dataTable", label: FUNC_NAMES.dataTable, icon: <LayoutDashboard/>, },
-              { key: "scriptManage", label: FUNC_NAMES.scriptManage, icon: <FileCode/>, },
-              { key: "taskManage", label: FUNC_NAMES.taskManage, icon: <CalendarClock/> },
-              { key: "logManage", label: FUNC_NAMES.logManage, icon: <ScrollText/> },
+              { key: "dataTable", label: FUNC_NAMES.dataTable, icon: <LayoutDashboard />, },
+              { key: "scriptManage", label: FUNC_NAMES.scriptManage, icon: <FileCode />, },
+              { key: "taskManage", label: FUNC_NAMES.taskManage, icon: <CalendarClock /> },
+              { key: "logManage", label: FUNC_NAMES.logManage, icon: <ScrollText /> },
             ]}
             onClick={this.handleClickMenu}
             defaultSelectedKeys={['taskManage']}
