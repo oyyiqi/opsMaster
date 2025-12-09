@@ -11,13 +11,13 @@ import {
 } from "@ant-design/icons";
 import { Button, Tag, Menu, Card, Tooltip, Input, message, Popconfirm } from "antd";
 import { Component } from "react";
-import "./index.css";
+import "./dark.less";
+import "./common.less";
 import { AddScriptModal } from "./addScriptModal";
 import { SCRIPT_TYPE } from "./const.js";
+import { SAVED_SCRIPTS_KEY } from "./const.js";
 
-const SAVED_SCRIPTS_KEY = 'savedScripts';
 
-const BORDER_STYLE = "1px solid #1e293b";
 const { TextArea } = Input;
 export default class ScriptManage extends Component {
   constructor(props) {
@@ -129,7 +129,7 @@ export default class ScriptManage extends Component {
               alignItems: "center",
             }}
           >
-            脚本列表
+            <span>脚本列表</span>
             <Button
               onClick={this.handleClickAdd}
               type="primary"
@@ -141,7 +141,6 @@ export default class ScriptManage extends Component {
             className="scriptList"
             mode="inline"
             theme="dark"
-            style={{height: '100%'}}
             onClick={this.handleClickScriptItem}
             selectedKeys={[selectedItem.key]}
           >
@@ -162,7 +161,13 @@ export default class ScriptManage extends Component {
           </Menu>
         </Sider>
         <Layout>
-          <Header>
+          <Header style={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '0 20px'
+            }}>
             <div
               style={{
                 display: "flex",

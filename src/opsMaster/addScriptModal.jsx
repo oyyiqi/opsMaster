@@ -1,6 +1,7 @@
 import { Modal, Input, Select, Form, Row, Col, Upload, Button, message } from "antd";
 import React, { Component } from "react";
-import "./index.css";
+import "./dark.less";
+import "./common.less";
 import { Option } from "antd/es/mentions";
 import { UploadOutlined } from "@ant-design/icons";
 const scriptTypes = ["python", "javascript", "shell"];
@@ -77,7 +78,7 @@ export class AddScriptModal extends Component {
                 name="scriptName"
                 style={{ marginBottom: "0" }}
               >
-                <Input placeholder="例如：每日垃圾文件清理"></Input>
+                <Input placeholder="默认以文件名命名"></Input>
               </Form.Item>
             </Col>
             <Col span={12}>

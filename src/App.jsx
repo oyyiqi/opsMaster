@@ -1,8 +1,7 @@
 import React, { Component } from 'react';
-import Hello from './Hello';
-import Read from './Read';
-import Write from './Write';
 import OpsMaster from './opsMaster/opsMaster';
+import { ConfigProvider } from 'antd';
+import { theme } from 'antd';
 
 class App extends Component {
   constructor(props) {
@@ -29,9 +28,14 @@ class App extends Component {
 
   render() {
     const { route, enterAction } = this.state;
-
     return (
-      <OpsMaster enterAction={enterAction} />
+      <ConfigProvider
+        theme={{
+          algorithm: theme.darkAlgorithm
+        }}
+      >
+        <OpsMaster enterAction={enterAction} />
+      </ConfigProvider>
     )
   }
 }

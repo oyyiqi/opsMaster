@@ -1,9 +1,20 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
+const schedule = require('node-schedule')
 
 // 通过 window 对象向渲染进程注入 nodejs 能力
 window.services = {
+  // 创建计划任务
+  createScheduleTask(cron, scriptName) {
+    const script = window.utools.dbStorage.getItem(scriptName);
+    const job = schedule.scheduleJob(cron, () => {
+      if (script.type === 'python')  {
+        this.runPythonScript(script.path);
+      }
+    })
+    console.log('注册任务成功')
+  },
   // 读文件
   readFile (file) {
     return fs.readFileSync(file, { encoding: 'utf-8' })
