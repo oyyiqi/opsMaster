@@ -3,36 +3,71 @@ const path = require('node:path')
 const { spawn } = require('node:child_process')
 const schedule = require('node-schedule')
 
+const SAVED_TASK_KEY = 'savedTask'
+const SAVED_SCRIPT_KEY = 'savedScripts'
+const {getItem, setItem, removeItem } = window.utools.dbStorage;
+
 
 // 通过 window 对象向渲染进程注入 nodejs 能力
 window.services = {
   // 创建计划任务
   createScheduleTask(options = {}) {
-    const { cron, targetDate, scriptName } = options
-    const script = window.utools.dbStorage.getItem(scriptName);
-    if (cron) {
-      schedule.scheduleJob(scriptName, cron, () => {
-        if (script.type === 'python') {
-          this.runPythonScript(script.path);
-        }
-      })
-      console.log('注册任务成功')
-      return true
-    } else {
-      schedule.scheduleJob(scriptName, targetDate, () => {
-        if (script.type === 'python') {
-          this.runPythonScript(script.path);
-        }
-      })
-      console.log('注册任务成功2')
-      return true
+    const { executeSchedule, scriptName, taskName } = options
+    if (executeSchedule.includes('T') && executeSchedule.includes('Z')) {
+      const currentTime = new Date();
+      const targetTime = new Date(executeSchedule);
+      if (currentTime.getTime() > targetTime.getTime()) {
+        console.log('单次任务执行时间已过，跳过重新注册，请检查任务是否成功执行')
+        return true;
+      }
     }
+    const script = getItem(scriptName);
+    schedule.scheduleJob(taskName, executeSchedule, () => {
+      if (script.type === 'python') {
+        this.runPythonScript(script.path);
+      }
+    });
+    console.log(`注册任务【${taskName}】成功！`)
+    return true;
+  },
+
+  reSignUpTask() {
+    // setItem(SAVED_TASK_KEY, ['单次任务', '周本', '测试2', '测试任务']);
+    // setItem(SAVED_SCRIPT_KEY, ['hello', 'test']);
+    let savedTask = getItem(SAVED_TASK_KEY);
+    if (!savedTask || savedTask.length === 0) {
+      console.log('当前无任务')
+      return;
+    }
+    console.log('注册过的任务：',savedTask);
+    const scheduleJobs = this.queryScheduleJobs();
+    savedTask.forEach(element => {
+      let taskInfo = getItem('task-' + element);
+      console.log('当前任务:',taskInfo.taskName);
+      if(scheduleJobs.hasOwnProperty(taskInfo.taskName)) {
+        console.log('此任务已注册');
+      } else {
+        console.log('此任务需要重新注册')
+        this.createScheduleTask(taskInfo);
+      }
+    })
   },
 
   queryScheduleJobs() {
     const scheduledJobs = schedule.scheduledJobs
     console.log(scheduledJobs)
-    console.log(typeof (scheduledJobs))
+    return scheduledJobs;
+  },
+
+  delelteScheduleJob(name) {
+    let job = this.queryScheduleJob(name);
+    if (job !== undefined) {
+      job.cancel()
+    }
+  },
+
+  queryScheduleJob(name) {
+    return schedule.scheduledJobs[name];
   },
 
   // 读文件

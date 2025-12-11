@@ -4,6 +4,7 @@ import "./dark.less";
 import "./common.less";
 import { Option } from "antd/es/mentions";
 import { UploadOutlined } from "@ant-design/icons";
+import { SAVED_SCRIPTS_KEY } from "./const";
 const scriptTypes = ["python", "javascript", "shell"];
 const { TextArea } = Input;
 export class AddScriptModal extends Component {
@@ -25,7 +26,7 @@ export class AddScriptModal extends Component {
       let end = file.lastIndexOf('.')
       scriptName = file.substring(start+1, end)
     }
-    let savedScripts = window.utools.dbStorage.getItem('savedScripts')
+    let savedScripts = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY)
     console.log(savedScripts)
     if (savedScripts && savedScripts.includes(scriptName)) {
       message.error("脚本名重复")
@@ -40,7 +41,7 @@ export class AddScriptModal extends Component {
       window.utools.dbStorage.setItem(scriptName, newScript);
       savedScripts = savedScripts ? savedScripts : [];
       savedScripts.push(scriptName);
-      window.utools.dbStorage.setItem('savedScripts', savedScripts);
+      window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, savedScripts);
       this.props.renderNewScript(newScript);
       this.props.handleAddModalCancel();
     }

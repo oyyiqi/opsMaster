@@ -1,24 +1,7 @@
 import { Row, Col, Form, Input, Select, DatePicker, TimePicker, Flex, Button, message } from "antd";
 import { Option } from "antd/es/mentions";
 import React, { Component } from "react";
-import { SAVED_SCRIPTS_KEY, SAVED_TASK_KEY } from "./const.js";
-
-const FREQUENCY = ['单次', '每天', '每周', '每月']
-const DAY_OF_WEEK = [
-  { value: '周一', key: 1 },
-  { value: '周二', key: 2 },
-  { value: '周三', key: 3 },
-  { value: '周四', key: 4 },
-  { value: '周五', key: 5 },
-  { value: '周六', key: 6 },
-  { value: '周日', key: 7 },
-]
-const DAY_OF_MONTH = [
-  1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-  11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-  21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-  31
-]
+import { SAVED_SCRIPTS_KEY, SAVED_TASK_KEY, FREQUENCY, DAY_OF_WEEK, DAY_OF_MONTH  } from "./const.js";
 
 const { setItem, getItem } = window.utools.dbStorage;
 
@@ -59,31 +42,19 @@ export default class NewTaskCard extends Component {
 
   handleClickConfirm = () => {
     const values = this.formRef.current.getFieldsValue();
-    const res = this.createTaskFromFormData(values);
-    if (res) {
-      let savedTask = getItem(SAVED_TASK_KEY);
-      savedTask = savedTask ? savedTask : [];
-      savedTask.push(values.taskName)
-      setItem(SAVED_TASK_KEY, savedTask);
-      setItem('task-' + values.taskName, values)
-    }
-  }
-
-  createTaskFromFormData = (values = {}) => {
-    window.utools.dbStorage.removeItem(SAVED_TASK_KEY);
     let savedTask = getItem(SAVED_TASK_KEY);
     if (savedTask && savedTask.includes(values.taskName)) {
       message.error('任务名称重复');
       return;
     }
-    let cron, targetDate;
+    let executeSchedule;
     if (values.executeFrequency === FREQUENCY[0]) {
-      targetDate = values.executeDateTime.toDate();
+      executeSchedule = values.executeDateTime.toDate();
     } else {
       const executeTime = values.executeTime;
       const dayOfWeek = values.dayOfWeek;
       const dayOfMonth = values.dayOfMonth;
-      cron = this.buildCronExpression({
+      executeSchedule = this.buildCronExpression({
         second: executeTime.second(),
         minute: executeTime.minute(),
         hour: executeTime.hour(),
@@ -91,7 +62,19 @@ export default class NewTaskCard extends Component {
         dayOfMonth,
       })
     }
-    return window.services.createScheduleTask({ cron, targetDate, scriptName: values.scriptName });
+    const res = window.services.createScheduleTask({ executeSchedule, scriptName: values.scriptName, taskName: values.taskName });
+    if (res) {
+      let savedTask = getItem(SAVED_TASK_KEY);
+      savedTask = savedTask ? savedTask : [];
+      savedTask.push(values.taskName)
+      console.log(savedTask)
+      setItem(SAVED_TASK_KEY, savedTask);
+      setItem('task-' + values.taskName, { executeSchedule, scriptName: values.scriptName, successNum: 0, failNum: 0, lastFailTime: null})
+      message.success('添加任务成功！');
+      this.props.updateParentState({savedTask, showNewPlan: false});
+    } else {
+      message.error('添加任务失败');
+    }
   }
 
   buildCronExpression(options = {}) {

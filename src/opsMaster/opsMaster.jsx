@@ -27,6 +27,7 @@ class OpsMaster extends Component {
 
   componentDidMount() {
     this.handleClickMenu({ key: "taskManage" });
+    window.services.reSignUpTask()
   }
 
   handleClickMenu = (item) => {
