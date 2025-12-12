@@ -310,11 +310,11 @@ export function parseSchedule(scheduleStr) {
     throw new Error(`Cron表达式必须为6位（秒 分 时 日 月 周），当前为${cronParts.length}位`);
   }
 
-  // 修复核心问题：为秒/分/时补充 alias（与字段名一致），避免 undefined
+  // 字段规则：修复周字段alias逻辑，补充「每周」前缀
   const fieldConfigs = [
-    { name: '秒', min: 0, max: 59, textMap: null, allowQuestion: false, alias: '秒' }, // 补充 alias
-    { name: '分', min: 0, max: 59, textMap: null, allowQuestion: false, alias: '分' }, // 补充 alias
-    { name: '时', min: 0, max: 23, textMap: null, allowQuestion: false, alias: '时' }, // 补充 alias
+    { name: '秒', min: 0, max: 59, textMap: null, allowQuestion: false, alias: '秒' },
+    { name: '分', min: 0, max: 59, textMap: null, allowQuestion: false, alias: '分' },
+    { name: '时', min: 0, max: 23, textMap: null, allowQuestion: false, alias: '时' },
     { 
       name: '日', 
       min: 1, 
@@ -339,7 +339,7 @@ export function parseSchedule(scheduleStr) {
       max: 6, 
       textMap: { sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6 }, 
       allowQuestion: true, 
-      alias: ['日','一','二','三','四','五','六'],
+      alias: ['日','一','二','三','四','五','六'], // 仅保留「日、一」等核心字
       periodKey: 'week'
     }
   ];
@@ -367,68 +367,68 @@ export function parseSchedule(scheduleStr) {
   // -------------- 第三步：解析核心周期（月/日/周）+ 频率（时/分/秒）--------------
   // 辅助函数：解析单个字段（仅处理周期相关逻辑，忽略固定值）
   const parseField = (part, config) => {
-    // 通配符*：返回空（默认全匹配，不显示）
     if (part === '*') return '';
-    // 占位符?：返回空（仅日/周使用，不显示）
     if (part === '?') return '';
 
-    // 列表（,分隔）：如1,3,5 → 1、3、5秒/分/时/号/月/周
+    // 列表（,分隔）：如1,3 → 周一、周三
     if (part.includes(',')) {
       const items = part.split(',').map(item => parseSingleItem(item, config));
-      return items.filter(Boolean).join('、');
+      const joined = items.filter(Boolean).join('、');
+      return config.name === '周' ? `每周${joined}` : joined; // 周列表加「每周」前缀
     }
 
-    // 步长（/分隔）：如*/5 → 每隔5秒/分/时/号/月/周
+    // 步长（/分隔）：如*/2 → 每周每隔2天（即每周一、三、五）
     if (part.includes('/')) {
       const [rangePart, stepPart] = part.split('/');
       const step = parseInt(stepPart, 10);
       if (isNaN(step) || step <= 0) {
         throw new Error(`非法步长：${stepPart}（${config.name}字段，步长需为正整数）`);
       }
-      if (rangePart === '*') return `每隔${step}${config.alias}`; // 现在 alias 不会为 undefined
+      if (rangePart === '*') {
+        return config.name === '周' 
+          ? `每周每隔${step}天` 
+          : `每隔${step}${config.alias}`;
+      }
       const rangeDesc = parseSingleItem(rangePart, config);
-      return `${rangeDesc}每隔${step}${config.alias}`;
+      return config.name === '周' 
+        ? `每周${rangeDesc}每隔${step}天` 
+        : `${rangeDesc}每隔${step}${config.alias}`;
     }
 
-    // 单个值/范围：仅周/月/日显示，时/分/秒的固定值忽略
-    if (config.periodKey) { // 仅周期字段（月/日/周）显示单个值/范围
-      return parseSingleItem(part, config);
+    // 单个值/范围：如2 → 每周二；1-3 → 每周一-周三
+    if (config.periodKey) {
+      const itemDesc = parseSingleItem(part, config);
+      return config.name === '周' ? `每周${itemDesc}` : itemDesc; // 周字段加「每周」前缀
     }
-    return ''; // 时/分/秒的单个固定值直接忽略
+    return '';
   };
 
   // 辅助函数：解析单个字段项
   const parseSingleItem = (item, config) => {
-    // 文本映射（如Jan→1，Sun→0）
+    // 文本映射（如Sun→0，Jan→1）
     if (config.textMap && config.textMap[item]) {
       item = config.textMap[item].toString();
     }
 
-    // 范围（-分隔）
+    // 范围（-分隔）：如1-3 → 一-三；周字段最终转为「每周一-三」
     if (item.includes('-')) {
       const [start, end] = item.split('-').map(val => parseValue(val, config));
       if (start === null || end === null || start > end) {
         throw new Error(`非法范围：${item}（${config.name}字段，需符合${config.min}-${config.max}且起始≤结束）`);
       }
-      // 周字段特殊处理：一-周三
-      if (config.name === '周') {
-        return `${config.alias[start]}-${config.alias[end]}周`;
-      }
-      // 其他字段：1-10秒/分/时/号/月
-      return `${start}-${end}${config.alias}`;
+      return config.name === '周' 
+        ? `${config.alias[start]}-${config.alias[end]}` // 周范围：一-三
+        : `${start}-${end}${config.alias}`; // 其他范围：1-10号、1-3月
     }
 
-    // 单个值
+    // 单个值：如2 → 二；周字段最终转为「每周二」
     const val = parseValue(item, config);
     if (val === null) {
       throw new Error(`非法${config.name}值：${item}（允许${config.min}-${config.max}）`);
     }
-    // 周字段特殊处理：周三
-    if (config.name === '周') {
-      return `${config.alias[val]}周`;
-    }
-    // 其他字段：10秒/5分/3号/2月
-    return `${val}${config.alias}`;
+    return config.name === '周' 
+      ? config.alias[val] // 周单个值：二
+      : `${val}${config.alias}`; // 其他单个值：5号、3月
   };
 
   // 辅助函数：解析单个数值（验证范围）
@@ -437,18 +437,18 @@ export function parseSchedule(scheduleStr) {
     return isNaN(num) || num < config.min || num > config.max ? null : num;
   };
 
-  // 1. 解析周期字段（月/日/周，索引3=日、4=月、5=周）
+  // 1. 解析周期字段（月/日/周）
   const periodFields = [3, 4, 5].map(index => {
     const part = normalizedParts[index];
     const config = fieldConfigs[index];
     return parseField(part, config);
   }).filter(Boolean);
 
-  // 2. 解析频率字段（时/分/秒，仅处理步长/范围/列表，忽略固定值）
+  // 2. 解析频率字段（时/分/秒）
   const freqFields = [0, 1, 2].map(index => {
     const part = normalizedParts[index];
     const config = fieldConfigs[index];
-    return parseField(part, config); // 复用 parseField，自动忽略固定值
+    return parseField(part, config);
   }).filter(Boolean);
 
   // -------------- 第四步：组合最终结果 --------------
@@ -462,7 +462,6 @@ export function parseSchedule(scheduleStr) {
     finalDesc = '每天';
   }
 
-  // 频率追加到周期后
   if (freqFields.length > 0 && periodFields.length > 0) {
     finalDesc += ` ${freqFields.join(' ')}`;
   }
