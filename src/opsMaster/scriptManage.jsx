@@ -24,27 +24,14 @@ import "./dark.less";
 import "./common.less";
 import { AddScriptModal } from "./addScriptModal";
 import { SCRIPT_TYPE } from "./const.js";
-import { SAVED_SCRIPTS_KEY } from "./const.js";
+import { queryScriptInfo, queryScriptList, removeScript } from "./util";
 
 const { TextArea } = Input;
 export default class ScriptManage extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      items: [
-        // {
-        //   key: "CICD_CHECK",
-        //   type: "python",
-        //   content: 'print("Hello, World!")',
-        //   abbreviation: 'PY',
-        // },
-        // {
-        //   key: "CICD_CHECK2",
-        //   type: "python",
-        //   content: 'print("Hello, World hhh!")',
-        //   abbreviation: 'PY',
-        // },
-      ],
+      items: [],
       selectedItem: {},
       isReadOnly: true,
       showAddScriptModal: false,
@@ -57,17 +44,15 @@ export default class ScriptManage extends Component {
 
   loadScripts = () => {
     const { items } = this.state;
-    let savedScripts = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
-    if (!savedScripts || savedScripts.length === 0) {
+    let scriptList = queryScriptList()
+    if (!scriptList || scriptList.length === 0) {
       return;
     }
-    console.log('开始加载已导入脚本:', savedScripts)
-    savedScripts.forEach((element) => {
-      let item = window.utools.dbStorage.getItem(element);
-      item.abbreviation = SCRIPT_TYPE.filter(
-        (value) => value.type === item.type
-      )[0].abbreviation;
-      items.push(item);
+    console.log('开始加载已导入脚本:', scriptList)
+    scriptList.forEach((scriptName) => {
+      let scriptInfo = queryScriptInfo(scriptName);
+      scriptInfo.abbreviation = SCRIPT_TYPE.filter((value) => value.type === scriptInfo.type)[0].abbreviation;
+      items.push(scriptInfo);
     });
     this.setState({ selectedItem: items[0], items });
   };
@@ -106,11 +91,8 @@ export default class ScriptManage extends Component {
     if (selectedItem.key === undefined) {
       message.info("请先选择脚本，再进行删除");
     } else {
+      removeScript(selectedItem.key);
       items = items.filter((item) => item.key !== selectedItem.key);
-      let savedScripts = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
-      savedScripts = savedScripts.filter((item) => item !== selectedItem.key);
-      window.utools.dbStorage.removeItem(selectedItem.key);
-      window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, savedScripts);
       selectedItem = items[0] ? items[0] : {};
       this.setState({ items, selectedItem }, () => message.info("删除成功！"));
     }

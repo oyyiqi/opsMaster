@@ -26,6 +26,8 @@ class OpsMaster extends Component {
   }
 
   componentDidMount() {
+    const allDocs = window.utools.db.allDocs();
+    console.log('已存储数据:', allDocs);
     this.handleClickMenu({ key: "taskManage" });
     window.services.reSignUpTask()
   }
@@ -53,7 +55,7 @@ class OpsMaster extends Component {
           <Menu
             theme="dark"
             mode="inline"
-            style={{ height: "100%" }}
+            style={{ height: "100vh", position: 'sticky', top: 0, left: 0, }}
             items={[
               { key: "dataTable", label: FUNC_NAMES.dataTable, icon: <LayoutDashboard />, },
               { key: "scriptManage", label: FUNC_NAMES.scriptManage, icon: <FileCode />, },

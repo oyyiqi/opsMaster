@@ -2,10 +2,11 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 const schedule = require('node-schedule')
+const moment = require('moment')
 
-const SAVED_TASK_KEY = 'savedTask'
-const SAVED_SCRIPT_KEY = 'savedScripts'
-const {getItem, setItem, removeItem } = window.utools.dbStorage;
+const SAVED_TASK_KEY = 'taskList'
+const SAVED_SCRIPTS_KEY = 'scriptList'
+
 
 
 // 通过 window 对象向渲染进程注入 nodejs 能力
@@ -13,37 +14,31 @@ window.services = {
   // 创建计划任务
   createScheduleTask(options = {}) {
     const { executeSchedule, scriptName, taskName } = options
-    if (executeSchedule.includes('T') && executeSchedule.includes('Z')) {
+    if (executeSchedule instanceof String && executeSchedule.includes('T') && executeSchedule.includes('Z')) {
       const currentTime = new Date();
       const targetTime = new Date(executeSchedule);
       if (currentTime.getTime() > targetTime.getTime()) {
         console.log('单次任务执行时间已过，跳过重新注册，请检查任务是否成功执行')
-        return true;
       }
     }
-    const script = getItem(scriptName);
+    const scriptInfo = queryScriptInfo(scriptName);
     schedule.scheduleJob(taskName, executeSchedule, () => {
-      if (script.type === 'python') {
-        this.runPythonScript(script.path);
-      }
+      this.runScript(taskName, scriptInfo);
     });
     console.log(`注册任务【${taskName}】成功！`)
-    return true;
   },
 
   reSignUpTask() {
-    // setItem(SAVED_TASK_KEY, ['单次任务', '周本', '测试2', '测试任务']);
-    // setItem(SAVED_SCRIPT_KEY, ['hello', 'test']);
-    let savedTask = getItem(SAVED_TASK_KEY);
+    let savedTask = queryTaskList();
     if (!savedTask || savedTask.length === 0) {
       console.log('当前无任务')
       return;
     }
     console.log('注册过的任务：',savedTask);
     const scheduleJobs = this.queryScheduleJobs();
-    savedTask.forEach(element => {
-      let taskInfo = getItem('task-' + element);
-      console.log('当前任务:',taskInfo.taskName);
+    savedTask.forEach(taskName => {
+      let taskInfo = queryTaskInfo(taskName)
+      console.log('当前任务:', taskName);
       if(scheduleJobs.hasOwnProperty(taskInfo.taskName)) {
         console.log('此任务已注册');
       } else {
@@ -54,9 +49,7 @@ window.services = {
   },
 
   queryScheduleJobs() {
-    const scheduledJobs = schedule.scheduledJobs
-    console.log(scheduledJobs)
-    return scheduledJobs;
+    return schedule.scheduledJobs
   },
 
   delelteScheduleJob(name) {
@@ -88,36 +81,118 @@ window.services = {
     fs.writeFileSync(filePath, base64Url.substring(matchs[0].length), { encoding: 'base64' })
     return filePath
   },
-  // 运行python脚本
-  runPythonScript(scriptPath) {
-    // 3. 使用 'cmd.exe' 或 'powershell.exe' 来执行组合命令
-    const pythonProcess = spawn('python.exe', [scriptPath], {
 
-    });
-    let dataOutput = '';
-    let errorOutput = '';
-    pythonProcess.stdout.on('data', (data) => {
-      dataOutput += data.toString();
+  runScript(taskName, scriptInfo) {
+    const {key, type, path} = scriptInfo;
+    const executor = getExecutor(type);
+    const process = spawn(executor, [path]);
+    // 监听标准输出流
+    process.stdout.on('data', (data) => {
       console.log(data.toString())
     })
-    // 3. 监听标准错误流 (stderr)
-    pythonProcess.stderr.on('data', (data) => {
-      errorOutput += data.toString();
+    // 监听标准错误流 (stderr)
+    process.stderr.on('data', (data) => {
       console.log(data.toString())
     });
-    // 4. 监听进程退出
-    pythonProcess.on('close', (code) => {
+    // 监听进程退出
+    process.on('close', (code) => {
       if (code !== 0) {
-        console.error(`Python 脚本执行失败，退出码: ${code}`);
-        console.error(`错误输出:\n${errorOutput}`);
+        console.error(`脚本${scriptInfo.key}执行失败，退出码: ${code}`);
+        addFailNum(taskName);
         return;
       }
-      console.log('--- Python 脚本执行成功 ---');
-      console.log('结果:', dataOutput.trim());
+      addSuccessNum(taskName);
+      console.log(`--- 脚本[${key} ${type}]执行成功 ---`);
     });
-    // 5. 监听进程错误 (例如：找不到 python 命令)
-    pythonProcess.on('error', (err) => {
-      console.error('执行 Python 进程时发生错误:', err);
+    // 监听进程错误 (例如：找不到 python 命令)
+    process.on('error', (err) => {
+      console.error('执行进程时发生错误:', err);
     });
   }
+
+}
+
+function getExecutor(scriptType) {
+  if (scriptType === 'python') {
+    return 'python';
+  }
+  if (scriptType === 'javascript') {
+    return 'node';
+  }
+  if (scriptType === 'shell') {
+    return 'sh';
+  }
+}
+
+function addFailNum(taskName) {
+  let taskInfo = queryTaskInfo(taskName);
+  taskInfo.failNum += 1;
+  const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss')
+  taskInfo.lastFailTime = now;
+  updateTask(taskName, taskInfo);
+}
+
+function addSuccessNum(taskName) {
+  let taskInfo = queryTaskInfo(taskName);
+  taskInfo.successNum += 1;
+  updateTask(taskName, taskInfo);
+}
+
+
+function queryScriptInfo(scriptName) {
+  return window.utools.dbStorage.getItem('script-' + scriptName);
+}
+
+function queryScriptList() {
+  const scriptList = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
+  return scriptList ? scriptList : [];
+}
+
+function saveScript(scriptName, scriptInfo) {
+  window.utools.dbStorage.setItem('script-' + scriptName, scriptInfo);
+  let scriptList = queryScriptList();
+  scriptList.push(scriptName)
+  saveScriptList(scriptList);
+}
+
+function removeScript(scriptName) {
+  let scriptList = queryScript();
+  scriptList = scriptList.filter((name) => name !== scriptName);
+  saveScriptList(scriptList);
+  window.utools.dbStorage.removeItem('script-' + scriptName);
+}
+
+function saveScriptList(scriptList) {
+  window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, scriptList);
+}
+
+function queryTaskInfo(taskName) {
+  return window.utools.dbStorage.getItem('task-' + taskName);
+}
+
+function queryTaskList() {
+  const taskList = window.utools.dbStorage.getItem(SAVED_TASK_KEY);
+  return taskList ? taskList : [];
+}
+
+function saveTask(taskName, taskInfo) {
+  window.utools.dbStorage.setItem('task-' + taskName, taskInfo);
+  let taskList = queryTaskList();
+  taskList.push(taskName)
+  saveTaskList(taskList);
+}
+
+function updateTask(taskName, taskInfo) {
+    window.utools.dbStorage.setItem('task-' + taskName, taskInfo);
+}
+
+function removeTask(taskName) {
+  let taskList = queryTaskList();
+  taskList = taskList.filter((name) => name !== taskName );
+  saveTaskList(taskList);
+  window.utools.dbStorage.removeItem('task-' + taskName);
+}
+
+function saveTaskList(taskList) {
+  window.utools.dbStorage.setItem(SAVED_TASK_KEY, taskList);
 }

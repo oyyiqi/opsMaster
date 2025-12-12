@@ -4,8 +4,10 @@ import "./dark.less";
 import "./common.less";
 import { Option } from "antd/es/mentions";
 import { UploadOutlined } from "@ant-design/icons";
-import { SAVED_SCRIPTS_KEY } from "./const";
-const scriptTypes = ["python", "javascript", "shell"];
+import { queryScriptList, saveScript } from "./util";
+import { SCRIPT_TYPE } from "./const";
+const scriptTypes = SCRIPT_TYPE.map((item) => item.type);
+const abbreviations = SCRIPT_TYPE.map((item) => item.abbreviation);
 const { TextArea } = Input;
 export class AddScriptModal extends Component {
   constructor(props) {
@@ -26,29 +28,27 @@ export class AddScriptModal extends Component {
       let end = file.lastIndexOf('.')
       scriptName = file.substring(start+1, end)
     }
-    let savedScripts = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY)
-    console.log(savedScripts)
-    if (savedScripts && savedScripts.includes(scriptName)) {
+    let scriptList = queryScriptList();
+    console.log(scriptList)
+    if (scriptList && scriptList.includes(scriptName)) {
       message.error("脚本名重复")
       return
     } else {
-      let newScript = { 
+      let scriptInfo = { 
         key: scriptName,
         type: scriptType,
         content: fileContent,
         path: file,
       }
-      window.utools.dbStorage.setItem(scriptName, newScript);
-      savedScripts = savedScripts ? savedScripts : [];
-      savedScripts.push(scriptName);
-      window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, savedScripts);
-      this.props.renderNewScript(newScript);
+      saveScript(scriptName, scriptInfo);
+      console.log('bbb')
+      this.props.renderNewScript(scriptInfo);
       this.props.handleAddModalCancel();
     }
   };
 
   handleClickUpload = () => {
-    const filters = [{ name: "script", extensions: ["js", "py", "sh", "bat"] }];
+    const filters = [{ name: "script", extensions: abbreviations }];
     const files = window.utools.showOpenDialog({ filters });
     const file = files[0];
     console.log(file)
@@ -65,12 +65,11 @@ export class AddScriptModal extends Component {
         onOk={this.handleOk}
         okText={"确认"}
         cancelText={"取消"}
+        style={{ top: 40 }}
       >
         <Form
           ref={this.formRef}
           layout="vertical"
-          // labelCol={{span: 8}}
-          // wrapperCol={{span: 16}}
         >
           <Row gutter={10} style={{ margin: "2px 0" }}>
             <Col span={12}>
@@ -96,7 +95,7 @@ export class AddScriptModal extends Component {
               </Form.Item>
             </Col>
           </Row>
-          <Row style={{ margin: "2px 0" }}>
+          <Row style={{ margin: "0px" }}>
             <Col span={24}>
               <Form.Item label="导入文件">
                 <Button
@@ -117,7 +116,7 @@ export class AddScriptModal extends Component {
                   }}
                   readOnly={true}
                   value={this.state.fileContent}
-                  rows={10}
+                  rows={8}
                   placeholder="导入文件进行预览"
                 ></TextArea>
               </Form.Item>
