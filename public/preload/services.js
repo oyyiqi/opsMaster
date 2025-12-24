@@ -6,8 +6,11 @@ const moment = require('moment')
 
 const SAVED_TASK_KEY = 'taskList'
 const SAVED_SCRIPTS_KEY = 'scriptList'
+const SUCCESS_NUM = 'successNum';
+const FAIL_NUM = 'failNum';
 
-
+const {getItem, setItem, removeItem} = window.utools.dbStorage;
+const { showNotification } = window.utools;
 
 // 通过 window 对象向渲染进程注入 nodejs 能力
 window.services = {
@@ -21,15 +24,16 @@ window.services = {
         console.log('单次任务执行时间已过，跳过重新注册，请检查任务是否成功执行')
       }
     }
-    const scriptInfo = queryScriptInfo(scriptName);
     schedule.scheduleJob(taskName, executeSchedule, () => {
-      this.runScript(taskName, scriptInfo);
+      this.runScript(taskName, scriptName);
     });
     console.log(`注册任务【${taskName}】成功！`)
   },
 
-  reSignUpTask() {
-    let savedTask = queryTaskList();
+  // 插件退出后重新注册所有任务
+  resignTask() {
+    let savedTask = this.queryTaskList();
+    console.log(savedTask);
     if (!savedTask || savedTask.length === 0) {
       console.log('当前无任务')
       return;
@@ -37,7 +41,7 @@ window.services = {
     console.log('注册过的任务：',savedTask);
     const scheduleJobs = this.queryScheduleJobs();
     savedTask.forEach(taskName => {
-      let taskInfo = queryTaskInfo(taskName)
+      let taskInfo = this.queryTaskInfo(taskName)
       console.log('当前任务:', taskName);
       if(scheduleJobs.hasOwnProperty(taskInfo.taskName)) {
         console.log('此任务已注册');
@@ -48,10 +52,12 @@ window.services = {
     })
   },
 
+  // 查询所有任务
   queryScheduleJobs() {
     return schedule.scheduledJobs
   },
 
+  // 根据任务名删除任务
   delelteScheduleJob(name) {
     let job = this.queryScheduleJob(name);
     if (job !== undefined) {
@@ -59,6 +65,7 @@ window.services = {
     }
   },
 
+  // 根据任务名查询任务
   queryScheduleJob(name) {
     return schedule.scheduledJobs[name];
   },
@@ -67,22 +74,18 @@ window.services = {
   readFile(file) {
     return fs.readFileSync(file, { encoding: 'utf-8' })
   },
-  // 文本写入到下载目录
-  writeTextFile(text) {
-    const filePath = path.join(window.utools.getPath('downloads'), Date.now().toString() + '.txt')
-    fs.writeFileSync(filePath, text, { encoding: 'utf-8' })
-    return filePath
-  },
-  // 图片写入到下载目录
-  writeImageFile(base64Url) {
-    const matchs = /^data:image\/([a-z]{1,20});base64,/i.exec(base64Url)
-    if (!matchs) return
-    const filePath = path.join(window.utools.getPath('downloads'), Date.now().toString() + '.' + matchs[1])
-    fs.writeFileSync(filePath, base64Url.substring(matchs[0].length), { encoding: 'base64' })
-    return filePath
-  },
 
-  runScript(taskName, scriptInfo) {
+  // 执行脚本
+  runScript(taskName, scriptName, executeType='auto') {
+    showNotification(`开始执行任务:${taskName}`, '数据面板');
+    let taskInfo = this.queryTaskInfo(taskName);
+    if (taskInfo.status === 1) {
+      console.log('任务正在执行，跳过此次执行');
+      return;
+    }
+    taskInfo.status = 1;
+    this.updateTask(taskInfo);
+    const scriptInfo = this.queryScriptInfo(scriptName);
     const {key, type, path} = scriptInfo;
     const executor = getExecutor(type);
     const process = spawn(executor, [path]);
@@ -96,20 +99,113 @@ window.services = {
     });
     // 监听进程退出
     process.on('close', (code) => {
+      let taskInfo = this.queryTaskInfo(taskName);
       if (code !== 0) {
         console.error(`脚本${scriptInfo.key}执行失败，退出码: ${code}`);
-        addFailNum(taskName);
-        return;
+        const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss')
+        taskInfo.failNum += 1;
+        taskInfo.lastFailTime = now;
+        this.totalFailPlus();
+      } else {
+        this.totalSuccessPlus();
+        taskInfo.successNum += 1;
+        console.log(`--- 脚本[${key} ${type}]执行成功 ---`);
       }
-      addSuccessNum(taskName);
-      console.log(`--- 脚本[${key} ${type}]执行成功 ---`);
+      const job = this.queryScheduleJob(taskName);
+      if (job === undefined) {
+        taskInfo.status = 2;
+      } else {
+        taskInfo.status = 0;
+      }
+      this.updateTask(taskInfo);
+      showNotification(`任务执行完成:${taskName}`, '数据面板');
     });
     // 监听进程错误 (例如：找不到 python 命令)
     process.on('error', (err) => {
       console.error('执行进程时发生错误:', err);
     });
-  }
+  },
 
+  // 更新任务
+  updateTask(taskInfo) {
+    setItem('task-' + taskInfo.taskName, taskInfo);
+  },
+
+  // 查询脚本信息
+  queryScriptInfo(scriptName) {
+    return getItem('script-' + scriptName);
+  },
+
+  totalSuccessPlus() {
+    let successNum = getItem(SUCCESS_NUM);
+    successNum = successNum ? successNum : 0;
+    successNum += 1;
+    setItem(SUCCESS_NUM, successNum);
+    window.customEvents.fireEvent('totalSuccessUpdate', successNum);
+    // window.dispatchEvent(new Event('totalSuccessUpdate', successNum));
+  },
+
+  totalFailPlus() {
+    let failNum = getItem(FAIL_NUM);
+    failNum = failNum ? failNum : 0;
+    failNum += 1;
+    setItem(FAIL_NUM, failNum);
+  },
+
+  saveScript(scriptName, scriptInfo) {
+    setItem('script-' + scriptName, scriptInfo);
+    let scriptList = this.queryScriptList();
+    scriptList.push(scriptName)
+    this.saveScriptList(scriptList);
+  },
+
+  queryScriptList() {
+    const scriptList = getItem(SAVED_SCRIPTS_KEY);
+    return scriptList ? scriptList : [];
+  },
+
+  removeScript(scriptName) {
+    let scriptList = queryScript();
+    scriptList = scriptList.filter((name) => name !== scriptName);
+    this.saveScriptList(scriptList);
+    removeItem('script-' + scriptName);
+  },
+
+  saveScriptList(scriptList) {
+    setItem(SAVED_SCRIPTS_KEY, scriptList);
+  },
+
+  queryTaskInfo(taskName) {
+    return getItem('task-' + taskName);
+  },
+
+  queryTaskList() {
+    const taskList = getItem(SAVED_TASK_KEY);
+    return taskList ? taskList : [];
+  },
+
+  saveTask(taskName, taskInfo) {
+    setItem('task-' + taskName, taskInfo);
+    let taskList = this.queryTaskList();
+    taskList.push(taskName)
+    this.saveTaskList(taskList);
+  },
+
+  removeTask(taskName) {
+    let taskList = this.queryTaskList();
+    taskList = taskList.filter((name) => name !== taskName );
+    this.saveTaskList(taskList);
+    removeItem('task-' + taskName);
+  },
+
+  saveTaskList(taskList) {
+    setItem(SAVED_TASK_KEY, taskList);
+  },
+
+  // 获取总成功调用次数
+  getTotalSuccessNum() {
+    return getItem(SUCCESS_NUM);
+  }
 }
 
 function getExecutor(scriptType) {
@@ -124,75 +220,4 @@ function getExecutor(scriptType) {
   }
 }
 
-function addFailNum(taskName) {
-  let taskInfo = queryTaskInfo(taskName);
-  taskInfo.failNum += 1;
-  const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss')
-  taskInfo.lastFailTime = now;
-  updateTask(taskName, taskInfo);
-}
 
-function addSuccessNum(taskName) {
-  let taskInfo = queryTaskInfo(taskName);
-  taskInfo.successNum += 1;
-  updateTask(taskName, taskInfo);
-}
-
-
-function queryScriptInfo(scriptName) {
-  return window.utools.dbStorage.getItem('script-' + scriptName);
-}
-
-function queryScriptList() {
-  const scriptList = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
-  return scriptList ? scriptList : [];
-}
-
-function saveScript(scriptName, scriptInfo) {
-  window.utools.dbStorage.setItem('script-' + scriptName, scriptInfo);
-  let scriptList = queryScriptList();
-  scriptList.push(scriptName)
-  saveScriptList(scriptList);
-}
-
-function removeScript(scriptName) {
-  let scriptList = queryScript();
-  scriptList = scriptList.filter((name) => name !== scriptName);
-  saveScriptList(scriptList);
-  window.utools.dbStorage.removeItem('script-' + scriptName);
-}
-
-function saveScriptList(scriptList) {
-  window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, scriptList);
-}
-
-function queryTaskInfo(taskName) {
-  return window.utools.dbStorage.getItem('task-' + taskName);
-}
-
-function queryTaskList() {
-  const taskList = window.utools.dbStorage.getItem(SAVED_TASK_KEY);
-  return taskList ? taskList : [];
-}
-
-function saveTask(taskName, taskInfo) {
-  window.utools.dbStorage.setItem('task-' + taskName, taskInfo);
-  let taskList = queryTaskList();
-  taskList.push(taskName)
-  saveTaskList(taskList);
-}
-
-function updateTask(taskName, taskInfo) {
-    window.utools.dbStorage.setItem('task-' + taskName, taskInfo);
-}
-
-function removeTask(taskName) {
-  let taskList = queryTaskList();
-  taskList = taskList.filter((name) => name !== taskName );
-  saveTaskList(taskList);
-  window.utools.dbStorage.removeItem('task-' + taskName);
-}
-
-function saveTaskList(taskList) {
-  window.utools.dbStorage.setItem(SAVED_TASK_KEY, taskList);
-}

@@ -2,9 +2,10 @@ import { Row, Col, Form, Input, Select, DatePicker, TimePicker, Flex, Button, me
 import { Option } from "antd/es/mentions";
 import React, { Component } from "react";
 import { SCHEDULE_TYPE, DAY_OF_WEEK, DAY_OF_MONTH  } from "./const.js";
-import { queryScriptList, queryTaskList, saveTask, buildCronExpression, is6BitCronValid } from "./util.js";
+import {buildCronExpression, is6BitCronValid } from "./util.js";
 
-const {ONE_TIME, DAYLY, WEEKLY, MONTHLY, CUSTOM} = SCHEDULE_TYPE
+const { services } = window;
+const {ONE_TIME, DAYLY, WEEKLY, MONTHLY, CUSTOM} = SCHEDULE_TYPE;
 
 export default class AddTaskCard extends Component {
 
@@ -18,7 +19,7 @@ export default class AddTaskCard extends Component {
   }
 
   componentDidMount() {
-    const scriptList = queryScriptList()
+    const scriptList = services.queryScriptList()
     this.setState({ scriptList })
   }
 
@@ -28,7 +29,7 @@ export default class AddTaskCard extends Component {
 
   handleClickSubmit = () => {
     const values = this.formRef.current.getFieldsValue();
-    let taskList = queryTaskList();
+    let taskList = services.queryTaskList();
     if (taskList && taskList.includes(values.taskName)) {
       message.error('任务名称重复');
       return;
@@ -42,8 +43,10 @@ export default class AddTaskCard extends Component {
         scriptName: values.scriptName,
         successNum: 0,
         failNum: 0,
-        lastFailTime: null}
-      saveTask(values.taskName, taskInfo);
+        lastFailTime: null,
+        status: 0
+      }
+      services.saveTask(values.taskName, taskInfo);
       taskList = taskList ? taskList : [];
       taskList.push(values.taskName)
       window.services.createScheduleTask({ executeSchedule, scriptName: values.scriptName, taskName: values.taskName });
@@ -89,6 +92,12 @@ export default class AddTaskCard extends Component {
         <div className="large-font" style={{ marginBottom: '10px' }}>配置新任务</div>
         <Form layout="vertical" ref={this.formRef} onFinish={this.handleClickSubmit}>
           <Row gutter={15}>
+            {/* <Col span={12}>
+              <Form.Item rules={[{ required: true, message: '必填' }]} label={'任务类型'} name={'taskType'}>
+                <Select>
+                </Select>
+              </Form.Item>
+            </Col> */}
             <Col span={12}>
               <Form.Item rules={[{ required: true, message: '必填' }]} label={'任务名称'} name={'taskName'}>
                 <Input ></Input>

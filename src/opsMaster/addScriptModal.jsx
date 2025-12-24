@@ -4,11 +4,11 @@ import "./dark.less";
 import "./common.less";
 import { Option } from "antd/es/mentions";
 import { UploadOutlined } from "@ant-design/icons";
-import { queryScriptList, saveScript } from "./util";
 import { SCRIPT_TYPE } from "./const";
 const scriptTypes = SCRIPT_TYPE.map((item) => item.type);
 const abbreviations = SCRIPT_TYPE.map((item) => item.abbreviation);
 const { TextArea } = Input;
+const { services } = window;
 export class AddScriptModal extends Component {
   constructor(props) {
     super(props);
@@ -22,13 +22,11 @@ export class AddScriptModal extends Component {
   handleOk = () => {
     const { file, fileContent } = this.state;
     let scriptName = this.formRef.current.getFieldValue('scriptName')
-    let scriptType = this.formRef.current.getFieldValue('scriptType')
-    if (scriptName === undefined || scriptName.trim().length === 0) {
-      let start = file.lastIndexOf('\\')
-      let end = file.lastIndexOf('.')
-      scriptName = file.substring(start+1, end)
-    }
-    let scriptList = queryScriptList();
+    let scriptMemo = this.formRef.current.getFieldValue('scriptMemo')
+    let start = file.lastIndexOf('.')
+    let abbreviation = file.substring(start + 1);
+    let scriptType = SCRIPT_TYPE.filter((item) => item.abbreviation === abbreviation)[0].type;
+    let scriptList = services.queryScriptList();
     console.log(scriptList)
     if (scriptList && scriptList.includes(scriptName)) {
       message.error("脚本名重复")
@@ -37,11 +35,12 @@ export class AddScriptModal extends Component {
       let scriptInfo = { 
         key: scriptName,
         type: scriptType,
+        abbreviation: abbreviation,
         content: fileContent,
         path: file,
+        memo: scriptMemo,
       }
-      saveScript(scriptName, scriptInfo);
-      console.log('bbb')
+      services.saveScript(scriptName, scriptInfo);
       this.props.renderNewScript(scriptInfo);
       this.props.handleAddModalCancel();
     }
@@ -51,7 +50,13 @@ export class AddScriptModal extends Component {
     const filters = [{ name: "script", extensions: abbreviations }];
     const files = window.utools.showOpenDialog({ filters });
     const file = files[0];
-    console.log(file)
+    let scriptName = this.formRef.current.getFieldValue('scriptName');
+    if (scriptName === undefined || scriptName.trim().length === 0) {
+      let start = file.lastIndexOf('\\');
+      let end = file.lastIndexOf('.');
+      scriptName = file.substring(start+1, end);
+    }
+    this.formRef.current.setFieldValue('scriptName', scriptName);
     const fileContent = window.services.readFile(file);
     this.setState({ file, fileContent });
   };
@@ -82,7 +87,7 @@ export class AddScriptModal extends Component {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item
+              {/* <Form.Item
                 label="脚本类型"
                 name="scriptType"
                 initialValue={"python"}
@@ -92,6 +97,12 @@ export class AddScriptModal extends Component {
                     <Option value={type}>{type}</Option>
                   ))}
                 </Select>
+              </Form.Item> */}
+              <Form.Item
+                label={'备注'}
+                name='scriptMemo'
+              >
+                <Input></Input>
               </Form.Item>
             </Col>
           </Row>

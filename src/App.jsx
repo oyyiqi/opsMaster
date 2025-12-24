@@ -2,13 +2,15 @@ import React, { Component } from 'react';
 import OpsMaster from './opsMaster/opsMaster';
 import { ConfigProvider } from 'antd';
 import { theme } from 'antd';
+import { APP_FUNCS } from './opsMaster/const';
 
 class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
       enterAction: {},
-      route: ''
+      route: '',
+      test: 'abc',
     };
   }
   
@@ -27,14 +29,14 @@ class App extends Component {
   }
 
   render() {
-    const { route, enterAction } = this.state;
+    const { route } = this.state;
     return (
       <ConfigProvider
         theme={{
           algorithm: theme.darkAlgorithm
         }}
       >
-        <OpsMaster enterAction={enterAction} />
+        <OpsMaster defaultSelectedKey={route} test={this.state.test} />
       </ConfigProvider>
     )
   }

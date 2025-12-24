@@ -1,58 +1,58 @@
-import { SAVED_SCRIPTS_KEY, SAVED_TASK_KEY } from "./const";
+// import { SAVED_SCRIPTS_KEY, SAVED_TASK_KEY } from "./const";
 
-export function queryScriptInfo(scriptName) {
-  return window.utools.dbStorage.getItem('script-' + scriptName);
-}
+// export function queryScriptInfo(scriptName) {
+//   return window.utools.dbStorage.getItem('script-' + scriptName);
+// }
 
-export function queryScriptList() {
-  const scriptList = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
-  return scriptList ? scriptList : [];
-}
+// export function queryScriptList() {
+//   const scriptList = window.utools.dbStorage.getItem(SAVED_SCRIPTS_KEY);
+//   return scriptList ? scriptList : [];
+// }
 
-export function saveScript(scriptName, scriptInfo) {
-  window.utools.dbStorage.setItem('script-' + scriptName, scriptInfo);
-  let scriptList = queryScriptList();
-  scriptList.push(scriptName)
-  saveScriptList(scriptList);
-}
+// export function saveScript(scriptName, scriptInfo) {
+//   window.utools.dbStorage.setItem('script-' + scriptName, scriptInfo);
+//   let scriptList = queryScriptList();
+//   scriptList.push(scriptName)
+//   saveScriptList(scriptList);
+// }
 
-export function removeScript(scriptName) {
-  let scriptList = queryScript();
-  scriptList = scriptList.filter((name) => name !== scriptName);
-  saveScriptList(scriptList);
-  window.utools.dbStorage.removeItem('script-' + scriptName);
-}
+// export function removeScript(scriptName) {
+//   let scriptList = queryScriptList();
+//   scriptList = scriptList.filter((name) => name !== scriptName);
+//   saveScriptList(scriptList);
+//   window.utools.dbStorage.removeItem('script-' + scriptName);
+// }
 
-function saveScriptList(scriptList) {
-  window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, scriptList);
-}
+// function saveScriptList(scriptList) {
+//   window.utools.dbStorage.setItem(SAVED_SCRIPTS_KEY, scriptList);
+// }
 
-export function queryTaskInfo(taskName) {
-  return window.utools.dbStorage.getItem('task-' + taskName);
-}
+// export function queryTaskInfo(taskName) {
+//   return window.utools.dbStorage.getItem('task-' + taskName);
+// }
 
-export function queryTaskList() {
-  const taskList = window.utools.dbStorage.getItem(SAVED_TASK_KEY);
-  return taskList ? taskList : [];
-}
+// export function queryTaskList() {
+//   const taskList = window.utools.dbStorage.getItem(SAVED_TASK_KEY);
+//   return taskList ? taskList : [];
+// }
 
-export function saveTask(taskName, taskInfo) {
-  window.utools.dbStorage.setItem('task-' + taskName, taskInfo);
-  let taskList = queryTaskList();
-  taskList.push(taskName)
-  saveTaskList(taskList);
-}
+// export function saveTask(taskName, taskInfo) {
+//   window.utools.dbStorage.setItem('task-' + taskName, taskInfo);
+//   let taskList = queryTaskList();
+//   taskList.push(taskName)
+//   saveTaskList(taskList);
+// }
 
-export function removeTask(taskName) {
-  let taskList = queryTaskList();
-  taskList = taskList.filter((name) => name !== taskName );
-  saveTaskList(taskList);
-  window.utools.dbStorage.removeItem('task-' + taskName);
-}
+// export function removeTask(taskName) {
+//   let taskList = queryTaskList();
+//   taskList = taskList.filter((name) => name !== taskName );
+//   saveTaskList(taskList);
+//   window.utools.dbStorage.removeItem('task-' + taskName);
+// }
 
-function saveTaskList(taskList) {
-  window.utools.dbStorage.setItem(SAVED_TASK_KEY, taskList);
-}
+// function saveTaskList(taskList) {
+//   window.utools.dbStorage.setItem(SAVED_TASK_KEY, taskList);
+// }
 
 
 /**
@@ -282,10 +282,12 @@ export function buildCronExpression(options = {}) {
   return fields.join(' ');
 }
 
+
+
 /**
  * 解析ISO时间字符串或6位Cron表达式，仅返回核心执行周期（忽略具体时/分/秒固定值）
  * @param {string} scheduleStr - 待解析的执行计划（ISO时间字符串或6位Cron）
- * @returns {string} 极简中文周期描述（如「单次」「每周三」「每隔10秒」）
+ * @returns {string} 极简中文周期描述（如「单次」「每周二」「每月2号」「每隔10秒」）
  * @throws {Error} 格式非法或不支持的场景抛出异常
  */
 export function parseSchedule(scheduleStr) {
@@ -310,7 +312,7 @@ export function parseSchedule(scheduleStr) {
     throw new Error(`Cron表达式必须为6位（秒 分 时 日 月 周），当前为${cronParts.length}位`);
   }
 
-  // 字段规则：修复周字段alias逻辑，补充「每周」前缀
+  // 字段规则：为日/月字段补充周期前缀标识
   const fieldConfigs = [
     { name: '秒', min: 0, max: 59, textMap: null, allowQuestion: false, alias: '秒' },
     { name: '分', min: 0, max: 59, textMap: null, allowQuestion: false, alias: '分' },
@@ -322,7 +324,8 @@ export function parseSchedule(scheduleStr) {
       textMap: null, 
       allowQuestion: true, 
       alias: '号',
-      periodKey: 'day'
+      periodKey: 'day',
+      periodPrefix: '每月' // 日字段的周期前缀（月为*时显示）
     },
     { 
       name: '月', 
@@ -331,7 +334,8 @@ export function parseSchedule(scheduleStr) {
       textMap: { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 }, 
       allowQuestion: false, 
       alias: '月',
-      periodKey: 'month'
+      periodKey: 'month',
+      periodPrefix: '' // 月字段本身已包含「月」字，无需额外前缀
     },
     { 
       name: '周', 
@@ -339,8 +343,9 @@ export function parseSchedule(scheduleStr) {
       max: 6, 
       textMap: { sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6 }, 
       allowQuestion: true, 
-      alias: ['日','一','二','三','四','五','六'], // 仅保留「日、一」等核心字
-      periodKey: 'week'
+      alias: ['日','一','二','三','四','五','六'],
+      periodKey: 'week',
+      periodPrefix: '每周' // 周字段的周期前缀
     }
   ];
 
@@ -359,25 +364,25 @@ export function parseSchedule(scheduleStr) {
   });
 
   // 校验日和周不能同时为?
-  const [, , , dayPart, , weekPart] = normalizedParts;
+  const [, , , dayPart, monthPart, weekPart] = normalizedParts;
   if (dayPart === '?' && weekPart === '?') {
     throw new Error('日和周不能同时为「?」（互斥）');
   }
 
   // -------------- 第三步：解析核心周期（月/日/周）+ 频率（时/分/秒）--------------
-  // 辅助函数：解析单个字段（仅处理周期相关逻辑，忽略固定值）
-  const parseField = (part, config) => {
+  // 辅助函数：解析单个字段（补充周期前缀，确保语义完整）
+  const parseField = (part, config, relatedParts = {}) => {
     if (part === '*') return '';
     if (part === '?') return '';
 
-    // 列表（,分隔）：如1,3 → 周一、周三
+    // 列表（,分隔）：如1,3 → 每月1、3号 / 每周一、三
     if (part.includes(',')) {
       const items = part.split(',').map(item => parseSingleItem(item, config));
       const joined = items.filter(Boolean).join('、');
-      return config.name === '周' ? `每周${joined}` : joined; // 周列表加「每周」前缀
+      return `${getPeriodPrefix(config, relatedParts)}${joined}`;
     }
 
-    // 步长（/分隔）：如*/2 → 每周每隔2天（即每周一、三、五）
+    // 步长（/分隔）：如*/2 → 每月每隔2号 / 每周每隔2天
     if (part.includes('/')) {
       const [rangePart, stepPart] = part.split('/');
       const step = parseInt(stepPart, 10);
@@ -385,22 +390,27 @@ export function parseSchedule(scheduleStr) {
         throw new Error(`非法步长：${stepPart}（${config.name}字段，步长需为正整数）`);
       }
       if (rangePart === '*') {
-        return config.name === '周' 
-          ? `每周每隔${step}天` 
-          : `每隔${step}${config.alias}`;
+        return `${getPeriodPrefix(config, relatedParts)}每隔${step}${config.alias}`;
       }
       const rangeDesc = parseSingleItem(rangePart, config);
-      return config.name === '周' 
-        ? `每周${rangeDesc}每隔${step}天` 
-        : `${rangeDesc}每隔${step}${config.alias}`;
+      return `${getPeriodPrefix(config, relatedParts)}${rangeDesc}每隔${step}${config.alias}`;
     }
 
-    // 单个值/范围：如2 → 每周二；1-3 → 每周一-周三
+    // 单个值/范围：如2 → 每月2号；1-3 → 每月1-3号 / 每周一-三
     if (config.periodKey) {
       const itemDesc = parseSingleItem(part, config);
-      return config.name === '周' ? `每周${itemDesc}` : itemDesc; // 周字段加「每周」前缀
+      return `${getPeriodPrefix(config, relatedParts)}${itemDesc}`;
     }
     return '';
+  };
+
+  // 辅助函数：获取字段的周期前缀（处理日字段与月字段的关联）
+  const getPeriodPrefix = (config, relatedParts) => {
+    // 日字段特殊处理：如果月字段是具体值（非*），则日字段不加「每月」前缀（如「3月2号」而非「每月3月2号」）
+    if (config.name === '日' && relatedParts.monthPart && relatedParts.monthPart !== '*') {
+      return '';
+    }
+    return config.periodPrefix || '';
   };
 
   // 辅助函数：解析单个字段项
@@ -410,7 +420,7 @@ export function parseSchedule(scheduleStr) {
       item = config.textMap[item].toString();
     }
 
-    // 范围（-分隔）：如1-3 → 一-三；周字段最终转为「每周一-三」
+    // 范围（-分隔）：如1-3 → 1-3号 / 一-三
     if (item.includes('-')) {
       const [start, end] = item.split('-').map(val => parseValue(val, config));
       if (start === null || end === null || start > end) {
@@ -418,17 +428,17 @@ export function parseSchedule(scheduleStr) {
       }
       return config.name === '周' 
         ? `${config.alias[start]}-${config.alias[end]}` // 周范围：一-三
-        : `${start}-${end}${config.alias}`; // 其他范围：1-10号、1-3月
+        : `${start}-${end}${config.alias}`; // 其他范围：1-3号、1-3月
     }
 
-    // 单个值：如2 → 二；周字段最终转为「每周二」
+    // 单个值：如2 → 2号 / 二；Jan→1月
     const val = parseValue(item, config);
     if (val === null) {
       throw new Error(`非法${config.name}值：${item}（允许${config.min}-${config.max}）`);
     }
     return config.name === '周' 
       ? config.alias[val] // 周单个值：二
-      : `${val}${config.alias}`; // 其他单个值：5号、3月
+      : `${val}${config.alias}`; // 其他单个值：2号、3月
   };
 
   // 辅助函数：解析单个数值（验证范围）
@@ -437,12 +447,17 @@ export function parseSchedule(scheduleStr) {
     return isNaN(num) || num < config.min || num > config.max ? null : num;
   };
 
-  // 1. 解析周期字段（月/日/周）
-  const periodFields = [3, 4, 5].map(index => {
-    const part = normalizedParts[index];
-    const config = fieldConfigs[index];
-    return parseField(part, config);
-  }).filter(Boolean);
+  // 1. 解析周期字段（月/日/周）：传递关联字段（月字段给日字段判断前缀）
+  const periodFields = [];
+  // 解析月字段
+  const monthDesc = parseField(monthPart, fieldConfigs[4]);
+  if (monthDesc) periodFields.push(monthDesc);
+  // 解析日字段：传递月字段信息，判断是否加「每月」前缀
+  const dayDesc = parseField(dayPart, fieldConfigs[3], { monthPart });
+  if (dayDesc) periodFields.push(dayDesc);
+  // 解析周字段
+  const weekDesc = parseField(weekPart, fieldConfigs[5]);
+  if (weekDesc) periodFields.push(weekDesc);
 
   // 2. 解析频率字段（时/分/秒）
   const freqFields = [0, 1, 2].map(index => {

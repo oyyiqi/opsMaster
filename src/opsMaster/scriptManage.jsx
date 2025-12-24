@@ -24,8 +24,7 @@ import "./dark.less";
 import "./common.less";
 import { AddScriptModal } from "./addScriptModal";
 import { SCRIPT_TYPE } from "./const.js";
-import { queryScriptInfo, queryScriptList, removeScript } from "./util";
-
+const { services } = window;
 const { TextArea } = Input;
 export default class ScriptManage extends Component {
   constructor(props) {
@@ -44,14 +43,14 @@ export default class ScriptManage extends Component {
 
   loadScripts = () => {
     const { items } = this.state;
-    let scriptList = queryScriptList()
+    let scriptList = services.queryScriptList()
     if (!scriptList || scriptList.length === 0) {
       return;
     }
     console.log('开始加载已导入脚本:', scriptList)
     scriptList.forEach((scriptName) => {
-      let scriptInfo = queryScriptInfo(scriptName);
-      scriptInfo.abbreviation = SCRIPT_TYPE.filter((value) => value.type === scriptInfo.type)[0].abbreviation;
+      let scriptInfo = services.queryScriptInfo(scriptName);
+      // scriptInfo.abbreviation = SCRIPT_TYPE.filter((value) => value.type === scriptInfo.type)[0].abbreviation;
       items.push(scriptInfo);
     });
     this.setState({ selectedItem: items[0], items });
@@ -91,7 +90,7 @@ export default class ScriptManage extends Component {
     if (selectedItem.key === undefined) {
       message.info("请先选择脚本，再进行删除");
     } else {
-      removeScript(selectedItem.key);
+      services.removeScript(selectedItem.key);
       items = items.filter((item) => item.key !== selectedItem.key);
       selectedItem = items[0] ? items[0] : {};
       this.setState({ items, selectedItem }, () => message.info("删除成功！"));
@@ -170,24 +169,20 @@ export default class ScriptManage extends Component {
           </Menu>
         </Sider>
         <Layout>
-          <Header
-            style={{
-              width: "100%",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "0 20px",
-            }}
+          <div
+            className="left-right-layout script-title"
           >
             <div
               style={{
                 display: "flex",
-                justifyContent: "center",
                 alignItems: "center",
               }}
             >
-              <Tag className="titleTag">{selectedItem.abbreviation}</Tag>
-              <span className="titleSpan">{selectedItem.key}</span>
+              <Tag  className="title-tag">{selectedItem.abbreviation}</Tag>
+              <div>
+                <div style={{ marginBottom: '1px' }} className="large-font">{selectedItem.key}</div>
+                <div className="small-font">{selectedItem.memo}</div>
+              </div>
             </div>
             <div>
               <Tooltip title="运行">
@@ -249,7 +244,7 @@ export default class ScriptManage extends Component {
                 </Tooltip>
               </Popconfirm>
             </div>
-          </Header>
+          </div>
           <Content>
             <TextArea
               className="codeViewer"

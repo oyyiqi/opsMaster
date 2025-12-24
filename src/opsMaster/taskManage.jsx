@@ -12,10 +12,11 @@ import { Component } from "react";
 import './common.less'
 import './dark.less'
 import AddTaskCard from "./addTaskCard";
-import { SCRIPT_TYPE } from "./const";
-import { queryScriptInfo, queryTaskInfo, queryTaskList, removeTask, parseSchedule } from "./util";
+import { SCRIPT_TYPE, TASK_STATUS } from "./const";
+// import { services.queryScriptInfo, services.queryTaskInfo, services.queryTaskList, services.removeTask, parseSchedule } from "./util";
+import { parseSchedule } from "./util";
 
-
+const {services} = window;
 export default class TaskManage extends Component {
   constructor(props) {
     super(props);
@@ -30,7 +31,7 @@ export default class TaskManage extends Component {
   }
 
   init = () => {
-    let taskList = queryTaskList();
+    let taskList = services.queryTaskList();
     this.setState({taskList});
   }
 
@@ -45,25 +46,27 @@ export default class TaskManage extends Component {
   // 任务查询
   handleClickQueryPlan = () => {
     console.log(window.services.queryScheduleJobs());
-    // setItem(SAVED_TASK_KEY, ['单次任务', '测试任务', '测试2', '周本']);
-    const allDocs = window.utools.db.allDocs();
-    console.log(allDocs);
+    console.log(window.utools.db.allDocs());
   }
 
   handleClickDelete = (taskName) => {
     let { taskList } = this.state
     taskList = taskList.filter((item) => item !== taskName);
     window.services.delelteScheduleJob(taskName);
-    this.setState({taskList}, () => removeTask(taskName));
+    this.setState({taskList}, () => services.removeTask(taskName));
     message.success(`删除任务成功`);
   }
 
-  handleClickRun = (taskName, scriptInfo) => {
-    window.services.runScript(taskName, scriptInfo)
+  handleClickRun = (taskName, scriptName) => {
+    window.services.runScript(taskName, scriptName)
   }
 
   closeNewPlan = () => {
     this.setState({ showNewPlan: false });
+  }
+
+  handleClickRefresh = () => {
+    this.init();
   }
   
 
@@ -76,32 +79,34 @@ export default class TaskManage extends Component {
       taskList.map((taskName) => {
         let taskFinished = false;
         let nextExecuteTime;
-        const taskInfo = queryTaskInfo(taskName);
+        const taskInfo = services.queryTaskInfo(taskName);
+        const status = TASK_STATUS[taskInfo.status];
         const {scriptName, executeSchedule} = taskInfo;
         const scheduleJob = window.services.queryScheduleJob(taskName);
         if (scheduleJob === undefined) {
           taskFinished = true;
         } else {
-          const nextInvocation = scheduleJob.nextInvocation()
+          const nextInvocation = scheduleJob.nextInvocation();
           if (nextInvocation) {
             nextExecuteTime = nextInvocation._date.toFormat("yyyy-MM-dd HH:mm:ss");
           } else {
             taskFinished = true;
           }
         }
-        const scriptInfo = queryScriptInfo(scriptName);
+        const scriptInfo = services.queryScriptInfo(scriptName);
         const suffix = SCRIPT_TYPE.filter((value) => value.type === scriptInfo.type)[0].abbreviation
         return (
-          <div className="taskItem left-right-layout" key={taskName}>
+          <div className="taskItem left-right-layout" style={{marginBottom: '0px'}} key={taskName}>
             <div>
               <div style={{ marginBottom: '8px' }} className="large-font">
                 <span style={{marginRight: '10px'}}>任务名称：{taskName}</span>
-                <Tag>{scriptName}.{suffix}</Tag>
+                <Tag style={{marginRight: '10px'}}>{scriptName}</Tag>
+                <Tag>{scriptInfo.type}</Tag>
               </div>
               <Tag variant="solid" color={'blue'} style={{marginRight: '5px'}}>{parseSchedule(executeSchedule)}</Tag>
-              {!taskFinished && <Tag color={'cyan'} style={{marginRight: '5px'}} variant="solid">就绪</Tag>}
-              {!taskFinished && <span className="small-font">下次执行：{nextExecuteTime}</span>}
-              {taskFinished && <Tag color={'success'} variant="solid">已完成</Tag>}
+              {!taskFinished && <Tag color={'cyan'} style={{marginRight: '5px'}} variant="solid">{status}</Tag>}
+              {!taskFinished && <Tag className="small-font">下次执行：{nextExecuteTime}</Tag>}
+              {taskFinished && <Tag color={'success'} variant="solid">{status}</Tag>}
             </div>
             <div>
               <Tooltip title="立即运行">
@@ -110,7 +115,7 @@ export default class TaskManage extends Component {
                   shape="circle"
                   icon={<CaretRightOutlined />}
                   style={{ marginRight: 8 }}
-                  onClick={() => this.handleClickRun(taskName, scriptInfo)}
+                  onClick={() => this.handleClickRun(taskName, scriptName)}
                 ></Button>
               </Tooltip>
               <Popconfirm
@@ -144,8 +149,11 @@ export default class TaskManage extends Component {
             <div style={{ marginBottom: '8px' }} className="large-font">执行计划列表</div>
             <div className="small-font">管理你的执行计划</div>
           </div>
-          <Button type="primary" onClick={this.handleClickQueryPlan}>查询任务</Button>
-          <Button type="primary" onClick={this.handleClickNewPlan}>新建计划</Button>
+          <div>
+            <Button type="primary" style={{marginRight: '10px'}} onClick={this.handleClickRefresh}>刷新列表</Button>
+            <Button type="primary" style={{marginRight: '10px'}} onClick={this.handleClickQueryPlan}>查询任务</Button>
+            <Button type="primary" onClick={this.handleClickNewPlan}>新建计划</Button>
+          </div>
         </div>
         {this.state.showNewPlan &&
           <AddTaskCard

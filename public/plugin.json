@@ -7,48 +7,26 @@
   },
   "features": [
     {
-      "code": "opsMaster",
-      "explain": "toolManager",
+      "code": "任务管理",
+      "explain": "ToDoManage",
       "cmds": [
-        "op",
-        "opsMaster",
-        "toolManager"
+        "task",
+        "plan",
+        "todo"
       ]
     },
     {
-      "code": "hello",
-      "explain": "这是插件应用的第一个功能",
-      "cmds": [
-        "你好",
-        "hello"
+      "code": "数据面板",
+      "cmds":[
+        "panel",
+        "dataPanel"
       ]
     },
     {
-      "code": "read",
-      "explain": "功能指令+匹配指令示例，使用 node.js 能力读文件",
-      "cmds": [
-        "读文件",
-        {
-          "type": "files",
-          "fileType": "file",
-          "maxLength": 1,
-          "label": "读文件"
-        }
-      ]
-    },
-    {
-      "code": "write",
-      "explain": "匹配指令示例，使用 node.js 能力写文件",
-      "mainHide": true,
-      "cmds": [
-        {
-          "type": "over",
-          "label": "保存为文件"
-        },
-        {
-          "type": "img",
-          "label": "保存为文件"
-        }
+      "code": "脚本管理",
+      "cmds":[
+        "scriptManage",
+        "script"
       ]
     }
   ]
