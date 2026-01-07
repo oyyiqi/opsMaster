@@ -10,7 +10,6 @@ class App extends Component {
     this.state = {
       enterAction: {},
       route: '',
-      test: 'abc',
     };
   }
   
@@ -36,7 +35,7 @@ class App extends Component {
           algorithm: theme.darkAlgorithm
         }}
       >
-        <OpsMaster defaultSelectedKey={route} test={this.state.test} />
+        <OpsMaster defaultSelectedKey={route} />
       </ConfigProvider>
     )
   }

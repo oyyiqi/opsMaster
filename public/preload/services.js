@@ -1,55 +1,231 @@
-const fs = require('node:fs')
-const path = require('node:path')
-const { spawn } = require('node:child_process')
-const schedule = require('node-schedule')
-const moment = require('moment')
-
-const SAVED_TASK_KEY = 'taskList'
-const SAVED_SCRIPTS_KEY = 'scriptList'
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawn } = require('node:child_process');
+const schedule = require('node-schedule');
+const moment = require('moment');
+const iconv = require('iconv-lite');
+const KEY_TASK_LIST = 'taskList'
+const KEY_SCRIPT_LIST = 'scriptList'
+const KEY_LOG_DATES = 'logDates';
 const SUCCESS_NUM = 'successNum';
 const FAIL_NUM = 'failNum';
-
-const {getItem, setItem, removeItem} = window.utools.dbStorage;
+const SCRIPT_TASK = '脚本任务';
+const KEY_REAL_TIME_LOG = 'realTimeLog';
+const { getItem, setItem, removeItem } = window.utools.dbStorage;
 const { showNotification } = window.utools;
+const { createCustomWindow } = require('./utils/customWindow');
+const { ipcRenderer } = require('electron');
 
+ipcRenderer.on('closeWindow', (evenet, data) => {
+  console.log(evenet);
+  console.log(data);
+})
+
+const windowList = [];
 // 通过 window 对象向渲染进程注入 nodejs 能力
 window.services = {
   // 创建计划任务
-  createScheduleTask(options = {}) {
-    const { executeSchedule, scriptName, taskName } = options
-    if (executeSchedule instanceof String && executeSchedule.includes('T') && executeSchedule.includes('Z')) {
+  createScheduleJob(taskInfo) {
+    const { executeSchedule, taskName } = taskInfo
+    if (taskInfo.status !== 0) {
+      console.log('非就绪状态无法注册任务', taskName);
+      return;
+    }
+    if (typeof(executeSchedule) === 'string' && executeSchedule.includes('T') && executeSchedule.includes('Z')) {
       const currentTime = new Date();
       const targetTime = new Date(executeSchedule);
       if (currentTime.getTime() > targetTime.getTime()) {
-        console.log('单次任务执行时间已过，跳过重新注册，请检查任务是否成功执行')
+        console.log(`单次任务[${taskName}]执行时间已过，不再重新注册，请检查任务是否成功执行`)
+        taskInfo.status = 2;
+        this.updateTask(taskInfo);
+        return;
       }
     }
-    schedule.scheduleJob(taskName, executeSchedule, () => {
-      this.runScript(taskName, scriptName);
-    });
+    schedule.scheduleJob(taskName, executeSchedule, () => this.executeTask(taskName));
     console.log(`注册任务【${taskName}】成功！`)
+  },
+
+  executeTask(taskName) {
+    const taskInfo = this.queryTaskInfo(taskName);
+    if (taskInfo.taskType === SCRIPT_TASK) {
+      this.executeScriptTask(taskInfo);
+    } else {
+      this.executeRemindTask(taskInfo)
+    }
+  },
+
+  executeRemindTask(taskInfo) {
+    const job = this.queryScheduleJob(taskInfo.taskName);
+    (job && job.nextInvocation()) ? taskInfo.status = 0 : taskInfo.status = 2;
+    taskInfo.lastExecuteTime =  moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
+    taskInfo.successNum += 1;
+    this.updateTask(taskInfo);
+    this.totalSuccessPlus();
+    // showNotification(taskInfo.taskName);
+    // window.customEvents.fireEvent("showMessageBox", taskInfo.taskName);
+    if (windowList.length >= 10) {
+      let dropWindow = windowList.shift();
+      dropWindow.close();
+    }
+    const win = createCustomWindow(`simple-gradient-reminder.html?taskName=${taskInfo.taskName}`);
+    // const win = createCustomWindow(`reminderCard.html?content=${taskInfo.taskName}`);
+    windowList.push(win);
+  },
+
+  // 执行脚本
+  executeScriptTask(taskInfo) {
+    const {taskName, scriptName} = taskInfo;
+    showNotification(`开始执行任务:${taskName}`, '日志管理');
+    if (taskInfo.status === 1) {
+      console.log('任务正在执行，跳过此次执行');
+      return;
+    }
+    taskInfo.status = 1;
+    this.updateTask(taskInfo);
+    const scriptInfo = this.queryScriptInfo(scriptName);
+    const {key, type, path} = scriptInfo;
+    const executor = getExecutor(type);
+    const process = spawn(executor, [path]);
+    // 监听标准输出流
+    process.stdout.on('data', (data) => {
+      const logStr = iconv.decode(data, 'utf-8');
+      this.appendLog(taskName, logStr);
+    })
+    // 监听标准错误流 (stderr)
+    process.stderr.on('data', (data) => {
+      const logStr = iconv.decode(data, 'utf-8');
+      this.appendLog(taskName, logStr);
+    });
+    // 监听进程退出
+    process.on('close', (code) => {
+      let taskInfo = this.queryTaskInfo(taskName);
+      const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
+      taskInfo.lastExecuteTime = now;
+      if (code !== 0) {
+        console.error(`脚本${scriptInfo.key}执行失败，退出码: ${code}`);
+        taskInfo.failNum += 1;
+        taskInfo.lastFailTime = now;
+        this.totalFailPlus();
+      } else {
+        this.totalSuccessPlus();
+        taskInfo.successNum += 1;
+        console.log(`--- 脚本[${key} ${type}]执行成功 ---`);
+      }
+      const job = this.queryScheduleJob(taskName);
+      if (job === undefined) {
+        taskInfo.status = 2;
+      } else {
+        taskInfo.status = 0;
+      }
+      this.updateTask(taskInfo);
+      showNotification(`任务执行完成:${taskName}`, '日志管理');
+    });
+    // 监听进程错误 (例如：找不到 python 命令)
+    process.on('error', (err) => {
+      this.appendLog(taskName, err.toString());
+    });
+  },
+
+  executeScript(scriptInfo) {
+    const {key, type, path} = scriptInfo;
+    const executor = getExecutor(type);
+    const process = spawn(executor, [path]);
+    // 监听标准输出流
+    process.stdout.on('data', (data) => {
+      console.log(data.toString());
+    })
+    // 监听标准错误流 (stderr)
+    process.stderr.on('data', (data) => {
+      console.log(data.toString())
+    });
+    // 监听进程错误 (例如：找不到 python 命令)
+    process.on('error', (err) => {
+      console.error('执行进程时发生错误:', err);
+    });
+    // 监听进程退出
+    process.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`脚本${scriptInfo.key}执行失败，退出码: ${code}`);
+      } else {
+        console.log(`--- 脚本[${key} ${type}]执行成功 ---`);
+      }
+    });
   },
 
   // 插件退出后重新注册所有任务
   resignTask() {
     let savedTask = this.queryTaskList();
-    console.log(savedTask);
+    console.log('注册过的任务',savedTask);
     if (!savedTask || savedTask.length === 0) {
       console.log('当前无任务')
       return;
     }
-    console.log('注册过的任务：',savedTask);
     const scheduleJobs = this.queryScheduleJobs();
     savedTask.forEach(taskName => {
       let taskInfo = this.queryTaskInfo(taskName)
-      console.log('当前任务:', taskName);
       if(scheduleJobs.hasOwnProperty(taskInfo.taskName)) {
         console.log('此任务已注册');
       } else {
-        console.log('此任务需要重新注册')
-        this.createScheduleTask(taskInfo);
+        this.createScheduleJob(taskInfo);
       }
     })
+  },
+
+  clearRealTimeLog() {
+    setItem(KEY_REAL_TIME_LOG, '');
+  },
+
+  queryRealTimeLog() {
+    let realTileLog = getItem(KEY_REAL_TIME_LOG);
+    return realTileLog ? realTileLog : '';
+  },
+
+  // 查询日志列表
+  queryLogDateList() {
+    let dates = getItem(KEY_LOG_DATES);
+    return dates ? dates : [];
+  },
+
+  queryTargetDateTaskList(date) {
+    const logs = getItem('logs-date-' + date);
+    return logs ? logs : [];
+  },
+
+  queryTargetTaskDateList(taskName) {
+    const logs = getItem('logs-task-' + taskName);
+    return logs ? logs : [];
+  },
+
+  queryTargetTaskAndDateLog(taskName, date) {
+    const log = getItem('log-' + taskName + '-' + date);
+    return log ? log : '';
+  },
+
+  appendLog(taskName, content) {
+    const date = moment(new Date()).format('YYYYMMDD');
+    const dateTime = moment(new Date()).format('YYYYMMDD HH:mm:ss');
+    const logDates = this.queryLogDateList();
+    if (!logDates.includes(date)) {
+      logDates.push(date);
+      setItem(KEY_LOG_DATES, logDates);
+    }
+    const targetDateLogs = this.queryTargetDateTaskList(date);
+    if (!targetDateLogs.includes(taskName)) {
+      targetDateLogs.push(taskName);
+      setItem('logs-date-' + date, targetDateLogs)
+    }
+    const targetTaskLogs = this.queryTargetTaskDateList(taskName);
+    if (!targetTaskLogs.includes(date)) {
+      targetTaskLogs.push(date);
+      setItem('logs-task-' + taskName, targetTaskLogs)
+    }
+    let currentLog = this.queryTargetTaskAndDateLog(taskName, date);
+    currentLog += content;
+    setItem('log-' + taskName + '-' + date, currentLog);
+    let realTimeLog = this.queryRealTimeLog();
+    realTimeLog += '[' + taskName + ']:' + content;
+    setItem(KEY_REAL_TIME_LOG, realTimeLog);
+    window.customEvents.fireEvent('realTimeLogUpdate', realTimeLog);
   },
 
   // 查询所有任务
@@ -75,57 +251,6 @@ window.services = {
     return fs.readFileSync(file, { encoding: 'utf-8' })
   },
 
-  // 执行脚本
-  runScript(taskName, scriptName, executeType='auto') {
-    showNotification(`开始执行任务:${taskName}`, '数据面板');
-    let taskInfo = this.queryTaskInfo(taskName);
-    if (taskInfo.status === 1) {
-      console.log('任务正在执行，跳过此次执行');
-      return;
-    }
-    taskInfo.status = 1;
-    this.updateTask(taskInfo);
-    const scriptInfo = this.queryScriptInfo(scriptName);
-    const {key, type, path} = scriptInfo;
-    const executor = getExecutor(type);
-    const process = spawn(executor, [path]);
-    // 监听标准输出流
-    process.stdout.on('data', (data) => {
-      console.log(data.toString())
-    })
-    // 监听标准错误流 (stderr)
-    process.stderr.on('data', (data) => {
-      console.log(data.toString())
-    });
-    // 监听进程退出
-    process.on('close', (code) => {
-      let taskInfo = this.queryTaskInfo(taskName);
-      if (code !== 0) {
-        console.error(`脚本${scriptInfo.key}执行失败，退出码: ${code}`);
-        const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss')
-        taskInfo.failNum += 1;
-        taskInfo.lastFailTime = now;
-        this.totalFailPlus();
-      } else {
-        this.totalSuccessPlus();
-        taskInfo.successNum += 1;
-        console.log(`--- 脚本[${key} ${type}]执行成功 ---`);
-      }
-      const job = this.queryScheduleJob(taskName);
-      if (job === undefined) {
-        taskInfo.status = 2;
-      } else {
-        taskInfo.status = 0;
-      }
-      this.updateTask(taskInfo);
-      showNotification(`任务执行完成:${taskName}`, '数据面板');
-    });
-    // 监听进程错误 (例如：找不到 python 命令)
-    process.on('error', (err) => {
-      console.error('执行进程时发生错误:', err);
-    });
-  },
-
   // 更新任务
   updateTask(taskInfo) {
     setItem('task-' + taskInfo.taskName, taskInfo);
@@ -137,19 +262,28 @@ window.services = {
   },
 
   totalSuccessPlus() {
-    let successNum = getItem(SUCCESS_NUM);
-    successNum = successNum ? successNum : 0;
+    let successNum = this.getTotalSuccessNum();
     successNum += 1;
     setItem(SUCCESS_NUM, successNum);
     window.customEvents.fireEvent('totalSuccessUpdate', successNum);
-    // window.dispatchEvent(new Event('totalSuccessUpdate', successNum));
   },
 
   totalFailPlus() {
-    let failNum = getItem(FAIL_NUM);
-    failNum = failNum ? failNum : 0;
+    let failNum = this.getTotalFailNum();
     failNum += 1;
     setItem(FAIL_NUM, failNum);
+    window.customEvents.fireEvent('totalFailUpdate', failNum);
+  },
+
+    // 获取总成功调用次数
+  getTotalSuccessNum() {
+    let successNum = getItem(SUCCESS_NUM);
+    return successNum ? successNum : 0;
+  },
+
+  getTotalFailNum() {
+    let failNum = getItem(FAIL_NUM);
+    return failNum ? failNum : 0;
   },
 
   saveScript(scriptName, scriptInfo) {
@@ -160,19 +294,19 @@ window.services = {
   },
 
   queryScriptList() {
-    const scriptList = getItem(SAVED_SCRIPTS_KEY);
+    const scriptList = getItem(KEY_SCRIPT_LIST);
     return scriptList ? scriptList : [];
   },
 
   removeScript(scriptName) {
-    let scriptList = queryScript();
+    let scriptList = this.queryScriptList();
     scriptList = scriptList.filter((name) => name !== scriptName);
     this.saveScriptList(scriptList);
     removeItem('script-' + scriptName);
   },
 
   saveScriptList(scriptList) {
-    setItem(SAVED_SCRIPTS_KEY, scriptList);
+    setItem(KEY_SCRIPT_LIST, scriptList);
   },
 
   queryTaskInfo(taskName) {
@@ -180,33 +314,41 @@ window.services = {
   },
 
   queryTaskList() {
-    const taskList = getItem(SAVED_TASK_KEY);
+    const taskList = getItem(KEY_TASK_LIST);
     return taskList ? taskList : [];
   },
 
-  saveTask(taskName, taskInfo) {
-    setItem('task-' + taskName, taskInfo);
+  saveTask(taskInfo) {
+    setItem('task-' + taskInfo.taskName, taskInfo);
     let taskList = this.queryTaskList();
-    taskList.push(taskName)
+    taskList.push(taskInfo.taskName)
     this.saveTaskList(taskList);
+    this.createScheduleJob(taskInfo);
   },
 
   removeTask(taskName) {
+    this.delelteScheduleJob(taskName);
     let taskList = this.queryTaskList();
     taskList = taskList.filter((name) => name !== taskName );
     this.saveTaskList(taskList);
     removeItem('task-' + taskName);
+    // 删除相关日志
+    const dateList = this.queryTargetTaskDateList(taskName);
+    dateList.forEach((date) => {
+      let taskList = this.queryTargetDateTaskList(date);
+      taskList = taskList.filter((task) => task !== taskName);
+      setItem('logs-date-' + date, taskList);
+      removeItem('log-' + taskName + '-' + date);
+    });
+    removeItem('logs-task' + taskName);
   },
 
   saveTaskList(taskList) {
-    setItem(SAVED_TASK_KEY, taskList);
+    setItem(KEY_TASK_LIST, taskList);
   },
 
-  // 获取总成功调用次数
-  getTotalSuccessNum() {
-    return getItem(SUCCESS_NUM);
-  }
 }
+
 
 function getExecutor(scriptType) {
   if (scriptType === 'python') {
@@ -216,7 +358,7 @@ function getExecutor(scriptType) {
     return 'node';
   }
   if (scriptType === 'shell') {
-    return 'sh';
+    return 'C:\\ProGram Files\\Git\\usr\\bin\\bash.exe';
   }
 }
 

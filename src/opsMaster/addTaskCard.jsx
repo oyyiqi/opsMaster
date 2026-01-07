@@ -1,7 +1,7 @@
 import { Row, Col, Form, Input, Select, DatePicker, TimePicker, Flex, Button, message } from "antd";
 import { Option } from "antd/es/mentions";
 import React, { Component } from "react";
-import { SCHEDULE_TYPE, DAY_OF_WEEK, DAY_OF_MONTH  } from "./const.js";
+import { SCHEDULE_TYPE, DAY_OF_WEEK, DAY_OF_MONTH, TASK_TYPE, SCRIPT_TYPE  } from "./const.js";
 import {buildCronExpression, is6BitCronValid } from "./util.js";
 
 const { services } = window;
@@ -13,7 +13,8 @@ export default class AddTaskCard extends Component {
     super(props);
     this.state = {
       scriptList: [],
-      scheduleType: '',
+      scheduleType: SCHEDULE_TYPE.ONE_TIME,
+      selectScriptDisable: true,
     }
     this.formRef = React.createRef();
   }
@@ -37,20 +38,20 @@ export default class AddTaskCard extends Component {
     let executeSchedule = this.getExecuteSchedule(values);
     // 注册任务
     try {
-      let taskInfo = { 
-        executeSchedule,
+      let taskInfo = {
         taskName: values.taskName,
+        taskType: values.taskType,
+        executeSchedule,
         scriptName: values.scriptName,
         successNum: 0,
         failNum: 0,
         lastFailTime: null,
-        status: 0
+        lastExecuteTime: '当前没有执行信息',
+        status: 0,
       }
-      services.saveTask(values.taskName, taskInfo);
-      taskList = taskList ? taskList : [];
-      taskList.push(values.taskName)
-      window.services.createScheduleTask({ executeSchedule, scriptName: values.scriptName, taskName: values.taskName });
-      this.props.updateParentState({taskList, showNewPlan: false});
+      services.saveTask(taskInfo);
+      this.props.refreshPage();
+      this.props.closeNewPlan();
       message.success('添加任务成功！');
     } catch (e) {
       console.error(e)
@@ -83,6 +84,13 @@ export default class AddTaskCard extends Component {
     }
   }
 
+  handleTaskTypeChange = (value) => {
+    if (value === TASK_TYPE.REMIND_TASK) {
+      this.formRef.current.setFieldValue('scriptName', '');
+    }
+    this.setState({selectScriptDisable: !this.state.selectScriptDisable})
+  }
+
 
 
   render() {
@@ -92,20 +100,25 @@ export default class AddTaskCard extends Component {
         <div className="large-font" style={{ marginBottom: '10px' }}>配置新任务</div>
         <Form layout="vertical" ref={this.formRef} onFinish={this.handleClickSubmit}>
           <Row gutter={15}>
-            {/* <Col span={12}>
-              <Form.Item rules={[{ required: true, message: '必填' }]} label={'任务类型'} name={'taskType'}>
-                <Select>
+            <Col span={8}>
+              <Form.Item rules={[{ required: true, message: '必填' }]} label={'任务类型'} name={'taskType'} initialValue={TASK_TYPE.REMIND_TASK}>
+                <Select onChange={this.handleTaskTypeChange}>
+                  {
+                    Object.values(TASK_TYPE).map((value) => (
+                      <Option value={value}>{value}</Option>
+                    ))
+                  }
                 </Select>
               </Form.Item>
-            </Col> */}
-            <Col span={12}>
+            </Col>
+            <Col span={8}>
               <Form.Item rules={[{ required: true, message: '必填' }]} label={'任务名称'} name={'taskName'}>
                 <Input ></Input>
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item rules={[{ required: true, message: '必填' }]} label={'执行脚本'} name={'scriptName'}>
-                <Select>
+            <Col span={8}>
+              <Form.Item rules={[{ required: !this.state.selectScriptDisable, message: '必填' }]}  label={'执行脚本'} name={'scriptName'}>
+                <Select disabled={this.state.selectScriptDisable}>
                   {this.state.scriptList.map((scriptName) => (
                     <Option value={scriptName}>{scriptName}</Option>
                   ))}
@@ -114,8 +127,8 @@ export default class AddTaskCard extends Component {
             </Col>
           </Row>
           <Row gutter={15}>
-            <Col span={12}>
-              <Form.Item rules={[{ required: true, message: '必填' }]} label={'计划类型'} name={'scheduleType'}>
+            <Col span={8}>
+              <Form.Item initialValue={SCHEDULE_TYPE.ONE_TIME} rules={[{ required: true, message: '必填' }]} label={'计划类型'} name={'scheduleType'}>
                 <Select
                   placeholder={'请选择计划类型'}
                   onSelect={this.handleSelectChange}
@@ -127,13 +140,13 @@ export default class AddTaskCard extends Component {
               </Form.Item>
             </Col>
             {scheduleType === ONE_TIME &&
-              <Col span={12}>
+              <Col span={8}>
                 <Form.Item label={'执行时间'} rules={[{ required: true, message: '必填' }]} name={'executeDateTime'}>
                   <DatePicker style={{width: '100%'}} placeholder="请选择执行时间" showTime={true}></DatePicker>
                 </Form.Item>
               </Col>}
             {scheduleType === WEEKLY &&
-              <Col span={6}>
+              <Col span={8}>
                 <Form.Item label={'执行日'} rules={[{ required: true, message: '必填' }]} name={'dayOfWeek'}>
                   <Select placeholder="请选择执行日">
                     {DAY_OF_WEEK.map((item) => (
@@ -143,7 +156,7 @@ export default class AddTaskCard extends Component {
                 </Form.Item>
               </Col>}
             {scheduleType === MONTHLY &&
-              <Col span={6}>
+              <Col span={8}>
                 <Form.Item label={'执行日'} rules={[{ required: true, message: '必填' }]} name={'dayOfMonth'}>
                   <Select placeholder="请选择执行日">
                     {DAY_OF_MONTH.map((item) => (
@@ -153,13 +166,13 @@ export default class AddTaskCard extends Component {
                 </Form.Item>
               </Col>}
             {[DAYLY, WEEKLY, MONTHLY].includes(scheduleType) &&
-              <Col span={scheduleType === DAYLY ? 12 : 6}>
+              <Col span={8}>
                 <Form.Item label={'执行时间'} rules={[{ required: true, message: '必填' }]} name={'executeTime'}>
                   <TimePicker placeholder="请选择执行时间" style={{width: '100%'}} ></TimePicker>
                 </Form.Item>
               </Col>}
             { scheduleType === CUSTOM &&
-              <Col span={12}>
+              <Col span={8}>
                 <Form.Item label={'自定义执行计划'} rules={[{ required: true, message: '必填' }]} name={'cronString'}>
                   <Input placeholder="支持6位cron表达式"></Input>
                 </Form.Item>

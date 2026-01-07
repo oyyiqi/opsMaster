@@ -13,8 +13,8 @@ export const SCRIPT_TYPE = [
 // ]
 
 export const TASK_TYPE = {
-  SCRIPT_TASK: '脚本任务',
   REMIND_TASK: '提醒任务',
+  SCRIPT_TASK: '脚本任务',
 }
 
 export const APP_FUNCS = {
@@ -24,11 +24,17 @@ export const APP_FUNCS = {
   LOG_MANAGE: '日志管理',
 }
 
+export const LOG_TYPE = {
+  REAL_TIME_LOG: '实时日志',
+  HISTORY_LOG: '历史日志'
+}
+
 
 export const TASK_STATUS = {
   0: '就绪',
   1: '运行中',
-  2: '已完成'
+  2: '已完成',
+  3: '挂起',
 }
 
 export const SAVED_SCRIPTS_KEY = 'scriptList';

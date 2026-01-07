@@ -1,13 +1,14 @@
-import { Layout, Menu } from "antd";
+import { Button, Layout, Menu, Modal, notification } from "antd";
 import React, { Component } from "react";
 import ScriptManage from "./scriptManage";
 import TaskManage from "./taskManage";
 import "./dark.less";
 import "./common.less";
-import { LayoutDashboard, FileCode, CalendarClock, ScrollText, Settings, Activity, Zap } from 'lucide-react';
+import { LayoutDashboard, FileCode, CalendarClock, ScrollText, Settings, Activity, Zap, AlarmClockCheck } from 'lucide-react';
 import { APP_FUNCS } from "./const";
 import DataPanel from "./dataPanel";
-
+import LogManage from "./logManage";
+import MessageBox from "./messageBox";
 const { Sider } = Layout;
 
 
@@ -15,11 +16,11 @@ class OpsMaster extends Component {
 
   constructor(props) {
     super(props);
-    console.log(props);
     this.state = {
       selectedKey: props.defaultSelectedKey,
       showScriptManage: false,
       showTaskManage: false,
+      showMessageBox: false,
     };
   }
 
@@ -37,7 +38,40 @@ class OpsMaster extends Component {
     this.setState({selectedKey: this.props.defaultSelectedKey});
     const allDocs = window.utools.db.allDocs();
     console.log('已存储数据:', allDocs);
+    // this.clearAllData();
     window.services.resignTask();
+    window.services.clearRealTimeLog();
+    window.customEvents.addEvent("showMessageBox", this.handleShowMessageBox);
+  }
+
+  componentWillUnmount() {
+    window.customEvents.removeEvent("showMessageBox", this.handleShowMessageBox);
+  }
+  
+  handleShowMessageBox = (message) => {
+    utools.createBrowserWindow('modal.html', {
+        width: 360,      // 窗口宽度
+        height: 200,     // 窗口高度
+        x: screen.width / 2 - 180, // 右下角定位
+        y: screen.height / 2 - 160,
+        frame: false,    // 无边框
+        transparent: false, // 透明背景
+        alwaysOnTop: true, // 置顶
+        resizable: false,  // 禁止调整大小
+        skipTaskbar: true, // 任务栏不显示
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false
+        }
+    })
+  }
+
+  clearAllData = () => {
+    let allDocs = window.utools.db.allDocs();
+    allDocs.forEach((doc) => {
+      console.log(doc._id);
+      window.utools.dbStorage.removeItem(doc._id);
+    })
   }
 
   handleClickMenu = (item) => {
@@ -48,7 +82,7 @@ class OpsMaster extends Component {
   }
 
   render() {
-    const { selectedKey } = this.state;
+    const { selectedKey,showMessageBox } = this.state;
     return (
       <Layout style={{ minHeight: "100vh" }}>
         <Sider width={180}>
@@ -71,6 +105,8 @@ class OpsMaster extends Component {
         {selectedKey === APP_FUNCS.DATA_PANEL && <DataPanel></DataPanel>}
         {selectedKey === APP_FUNCS.SCRIPT_MANAGE  && <ScriptManage></ScriptManage>}
         {selectedKey === APP_FUNCS.TASK_MANAGE && <TaskManage></TaskManage>}
+        {selectedKey === APP_FUNCS.LOG_MANAGE && <LogManage></LogManage>}
+        {/* {showMessageBox && <MessageBox></MessageBox>} */}
       </Layout>
     );
   }

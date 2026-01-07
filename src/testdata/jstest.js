@@ -1,1 +1,1 @@
-console.log('hi javascript');
+console.log('你好');

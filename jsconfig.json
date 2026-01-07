@@ -8,5 +8,5 @@
   "include": [
     "src/**/*.jsx",
     "src/**/*.js"
-  ]
+, "utils/eventBus.js"  ]
 }

@@ -18,16 +18,20 @@ export default class DataPanel extends Component {
   componentDidMount() {
     this.init();
     customEvents.addEvent('totalSuccessUpdate', this.handleTotalSuccessUpdate);
-    // window.addEventListener('totalSuccessUpdate', this.handleTotalSuccessUpdate);
+    customEvents.addEvent('totalFailUpdate', this.handleTotalFailUpdate);
   }
 
   componentWillUnmount() {
     customEvents.removeEvent('totalSuccessUpdate', this.handleTotalSuccessUpdate);
-    // window.removeEventListener('totalSuccessUpdate', this.handleTotalSuccessUpdate)
+    customEvents.removeEvent('totalFailUpdate', this.handleTotalFailUpdate);
   }
 
   handleTotalSuccessUpdate = (successNum) => {
     this.setState({successNum})
+  }
+
+    handleTotalFailUpdate = (failNum) => {
+    this.setState({failNum})
   }
 
   init = () => {
@@ -36,7 +40,8 @@ export default class DataPanel extends Component {
     const scriptNum = scriptList.length;
     const taskNum = taskList.length;
     const successNum = window.services.getTotalSuccessNum();
-    this.setState({scriptNum, taskNum, successNum})
+    const failNum = window.services.getTotalFailNum();
+    this.setState({scriptNum, taskNum, successNum, failNum})
   }
 
   render() {
@@ -58,12 +63,12 @@ export default class DataPanel extends Component {
       <Row>
           <Col span={12} >
             <Card  style={{margin: '0 10px 10px 10px'}} >
-              <Statistic title="成功调用次数" value={successNum} prefix={<FileCode/>} suffix={'次'} />
+              <Statistic title="任务成功次数" value={successNum} prefix={<FileCode/>} suffix={'次'} />
             </Card>
           </Col>
           <Col span={12}>
             <Card  style={{margin: '0 10px 0 0'}}  >
-              <Statistic title="最近失败次数（24小时）" value={failNum} prefix={<CalendarClock/>} suffix={'次'} />
+              <Statistic title="任务失败次数" value={failNum} prefix={<CalendarClock/>} suffix={'次'} />
             </Card>
           </Col>
       </Row>

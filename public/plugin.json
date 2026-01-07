@@ -28,6 +28,18 @@
         "scriptManage",
         "script"
       ]
+    },
+    {
+      "code": "日志管理",
+      "cmds":[
+        "logManage",
+        "log"
+      ]
     }
-  ]
+  ],
+  "webPreferences": {
+    "nodeIntegration": true,
+    "contextIsolation": false,
+    "enableRemoteModule": true      
+  }
 }

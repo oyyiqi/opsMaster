@@ -98,9 +98,7 @@ export default class ScriptManage extends Component {
   };
 
   handleClickRun = () => {
-    const scriptPath = this.state.selectedItem.path;
-    console.log(scriptPath);
-    window.services.runPythonScript(scriptPath);
+    window.services.executeScript(this.state.selectedItem);
   };
 
   renderNewScript = (newScript) => {
