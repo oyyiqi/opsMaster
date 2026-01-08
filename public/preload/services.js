@@ -14,11 +14,175 @@ const KEY_REAL_TIME_LOG = 'realTimeLog';
 const { getItem, setItem, removeItem } = window.utools.dbStorage;
 const { showNotification } = window.utools;
 const { createCustomWindow } = require('./utils/customWindow');
-
 const windowList = [];
 // 通过 window 对象向渲染进程注入 nodejs 能力
 window.services = {
-  // 创建计划任务
+  /*********** 脚本相关操作 ***********/
+  // 查询脚本信息
+  queryScriptInfo(scriptName) {
+    return getItem('script-' + scriptName);
+  },
+  // 新增脚本信息
+  saveScript(scriptInfo) {
+    setItem('script-' + scriptInfo.key, scriptInfo);
+    let scriptList = this.queryScriptList();
+    scriptList.push(scriptInfo.key)
+    this.saveScriptList(scriptList);
+  },
+  // 修改脚本信息
+  updateScript(scriptInfo) {
+    setItem('script-' + scriptInfo.key, scriptInfo);
+  },
+  // 删除脚本信息
+  removeScript(scriptName) {
+    // 删除关联此脚本的任务
+    const scriptInfo = this.queryScriptInfo(scriptName);
+    const taskList = scriptInfo.task;
+    taskList.forEach((taskName) => {
+      this.removeTask(taskName);
+    });
+    // 删除脚本信息
+    let scriptList = this.queryScriptList();
+    scriptList = scriptList.filter((name) => name !== scriptName);
+    this.saveScriptList(scriptList);
+    removeItem('script-' + scriptName);
+  },
+  // 查询脚本列表
+  queryScriptList() {
+    const scriptList = getItem(KEY_SCRIPT_LIST);
+    return scriptList ? scriptList : [];
+  },
+  // 保存脚本列表
+  saveScriptList(scriptList) {
+    setItem(KEY_SCRIPT_LIST, scriptList);
+  },
+  /*********** 任务信息相关操作 ***********/
+  // 查询任务
+  queryTaskInfo(taskName) {
+    return getItem('task-' + taskName);
+  },
+  // 新增任务
+  saveTask(taskInfo) {
+    setItem('task-' + taskInfo.taskName, taskInfo);
+    let taskList = this.queryTaskList();
+    taskList.push(taskInfo.taskName)
+    this.saveTaskList(taskList);
+    this.createScheduleJob(taskInfo);
+    if (taskInfo.taskType === SCRIPT_TASK) {
+      let scriptInfo = this.queryScriptInfo(taskInfo.scriptName);
+      scriptInfo.task = scriptInfo.task ? scriptInfo.task : [];
+      scriptInfo.task.push(taskInfo.taskName);
+      this.updateScript(scriptInfo);
+    }
+  },
+  // 修改任务
+  updateTask(taskInfo) {
+    setItem('task-' + taskInfo.taskName, taskInfo);
+  },
+  // 删除任务
+  removeTask(taskName) {
+    const taskInfo = this.queryTaskInfo(taskName);
+    // 删除job
+    this.delelteScheduleJob(taskName);
+    // taskList中删除该任务
+    let taskList = this.queryTaskList();
+    taskList = taskList.filter((name) => name !== taskName );
+    this.saveTaskList(taskList);
+    // 删除任务信息
+    removeItem('task-' + taskName);
+    // 删除相关日志
+    const dateList = this.queryTargetTaskDateList(taskName);
+    dateList.forEach((date) => {
+      let taskList = this.queryTargetDateTaskList(date);
+      taskList = taskList.filter((task) => task !== taskName);
+      setItem('logs-date-' + date, taskList);
+      removeItem('log-' + taskName + '-' + date);
+    });
+    removeItem('logs-task' + taskName);
+    // 删除任务与脚本的关联
+    if (taskInfo.taskType === SCRIPT_TASK) {
+        let scriptInfo = this.queryScriptInfo(taskInfo.scriptName);
+        scriptInfo.task = scriptInfo.task ? scriptInfo.task : [];
+        scriptInfo.task = scriptInfo.task.filter((name) => { name !== taskName});
+        this.updateScript(scriptInfo);
+    }
+  },
+  // 查询任务列表
+  queryTaskList() {
+    const taskList = getItem(KEY_TASK_LIST);
+    return taskList ? taskList : [];
+  },
+  // 保存任务列表
+  saveTaskList(taskList) {
+    setItem(KEY_TASK_LIST, taskList);
+  },
+  /*********** 日志相关操作 ***********/
+  // 查询实时日志
+  queryRealTimeLog() {
+    let realTileLog = getItem(KEY_REAL_TIME_LOG);
+    return realTileLog ? realTileLog : '';
+  },
+  // 更新实时日志
+  updateRealTimeLog(title, content) {
+    let realTimeLog = this.queryRealTimeLog();
+    realTimeLog += '[' + title + ']:' + content;
+    setItem(KEY_REAL_TIME_LOG, realTimeLog);
+    window.customEvents.fireEvent('realTimeLogUpdate', realTimeLog);
+  },
+    // 清空实时日志
+  clearRealTimeLog() {
+    setItem(KEY_REAL_TIME_LOG, '');
+  },
+  // 查询有日志的日期列表
+  queryLogDateList() {
+    let dates = getItem(KEY_LOG_DATES);
+    return dates ? dates : [];
+  },
+  // 查询指定日期有日志的任务列表
+  queryTargetDateTaskList(date) {
+    const logs = getItem('logs-date-' + date);
+    return logs ? logs : [];
+  },
+  // 查询指定任务有日志的日期列表
+  queryTargetTaskDateList(taskName) {
+    const logs = getItem('logs-task-' + taskName);
+    return logs ? logs : [];
+  },
+  // 查询指定任务和日期的日志
+  queryTargetTaskAndDateLog(taskName, date) {
+    const log = getItem('log-' + taskName + '-' + date);
+    return log ? log : '';
+  },
+  // 添加日志
+  appendLog(taskName, content) {
+    const date = moment(new Date()).format('YYYYMMDD');
+    // 日志日期列表新增当前日期
+    const logDates = this.queryLogDateList();
+    if (!logDates.includes(date)) {
+      logDates.push(date);
+      setItem(KEY_LOG_DATES, logDates);
+    }
+    // 当前日期的日志列表添加当前任务名
+    const targetDateLogs = this.queryTargetDateTaskList(date);
+    if (!targetDateLogs.includes(taskName)) {
+      targetDateLogs.push(taskName);
+      setItem('logs-date-' + date, targetDateLogs)
+    }
+    // 当前任务的日志列表添加当前日期
+    const targetTaskLogs = this.queryTargetTaskDateList(taskName);
+    if (!targetTaskLogs.includes(date)) {
+      targetTaskLogs.push(date);
+      setItem('logs-task-' + taskName, targetTaskLogs)
+    }
+    // 将日志内容追加写入到当前日期当前任务的日志中
+    let currentLog = this.queryTargetTaskAndDateLog(taskName, date);
+    currentLog += content;
+    setItem('log-' + taskName + '-' + date, currentLog);
+    // 日志内容更新到实时日志中
+    this.updateRealTimeLog(taskName, content);
+  },
+  /*********** 调度任务相关操作 ***********/
+    // 创建计划任务
   createScheduleJob(taskInfo) {
     const { executeSchedule, taskName } = taskInfo
     if (taskInfo.status !== 0) {
@@ -38,7 +202,7 @@ window.services = {
     schedule.scheduleJob(taskName, executeSchedule, () => this.executeTask(taskName));
     console.log(`注册任务【${taskName}】成功！`)
   },
-
+  // 执行任务
   executeTask(taskName) {
     const taskInfo = this.queryTaskInfo(taskName);
     if (taskInfo.taskType === SCRIPT_TASK) {
@@ -47,7 +211,6 @@ window.services = {
       this.executeRemindTask(taskInfo)
     }
   },
-
   // 执行提醒任务
   executeRemindTask(taskInfo) {
     const job = this.queryScheduleJob(taskInfo.taskName);
@@ -63,7 +226,6 @@ window.services = {
     const win = createCustomWindow(`simple-gradient-reminder.html?taskName=${taskInfo.taskName}`);
     windowList.push(win);
   },
-
   // 执行脚本任务
   executeScriptTask(taskInfo) {
     const {taskName, scriptName} = taskInfo;
@@ -117,7 +279,6 @@ window.services = {
       this.appendLog(taskName, err.toString());
     });
   },
-
   // 单独执行脚本
   executeScript(scriptInfo) {
     const {key, type, path} = scriptInfo;
@@ -147,8 +308,7 @@ window.services = {
       }
     });
   },
-
-  // 插件退出后重新注册所有任务
+  // 重新注册所有任务
   resignTask() {
     let savedTask = this.queryTaskList();
     console.log('注册过的任务',savedTask);
@@ -166,208 +326,55 @@ window.services = {
       }
     })
   },
-
-  clearRealTimeLog() {
-    setItem(KEY_REAL_TIME_LOG, '');
-  },
-
-  queryRealTimeLog() {
-    let realTileLog = getItem(KEY_REAL_TIME_LOG);
-    return realTileLog ? realTileLog : '';
-  },
-
-  // 查询日志列表
-  queryLogDateList() {
-    let dates = getItem(KEY_LOG_DATES);
-    return dates ? dates : [];
-  },
-
-  queryTargetDateTaskList(date) {
-    const logs = getItem('logs-date-' + date);
-    return logs ? logs : [];
-  },
-
-  queryTargetTaskDateList(taskName) {
-    const logs = getItem('logs-task-' + taskName);
-    return logs ? logs : [];
-  },
-
-  queryTargetTaskAndDateLog(taskName, date) {
-    const log = getItem('log-' + taskName + '-' + date);
-    return log ? log : '';
-  },
-
-  appendLog(taskName, content) {
-    const date = moment(new Date()).format('YYYYMMDD');
-    const dateTime = moment(new Date()).format('YYYYMMDD HH:mm:ss');
-    const logDates = this.queryLogDateList();
-    if (!logDates.includes(date)) {
-      logDates.push(date);
-      setItem(KEY_LOG_DATES, logDates);
-    }
-    const targetDateLogs = this.queryTargetDateTaskList(date);
-    if (!targetDateLogs.includes(taskName)) {
-      targetDateLogs.push(taskName);
-      setItem('logs-date-' + date, targetDateLogs)
-    }
-    const targetTaskLogs = this.queryTargetTaskDateList(taskName);
-    if (!targetTaskLogs.includes(date)) {
-      targetTaskLogs.push(date);
-      setItem('logs-task-' + taskName, targetTaskLogs)
-    }
-    let currentLog = this.queryTargetTaskAndDateLog(taskName, date);
-    currentLog += content;
-    setItem('log-' + taskName + '-' + date, currentLog);
-    this.updateRealTimeLog(taskName, content);
-  },
-
-  updateRealTimeLog(title, content) {
-    let realTimeLog = this.queryRealTimeLog();
-    realTimeLog += '[' + title + ']:' + content;
-    setItem(KEY_REAL_TIME_LOG, realTimeLog);
-    window.customEvents.fireEvent('realTimeLogUpdate', realTimeLog);
-  },
-
-  // 查询所有任务
+  // 查询所有job
   queryScheduleJobs() {
     return schedule.scheduledJobs
   },
-
-  // 根据任务名删除任务
+  // 根据任务名删除job
   delelteScheduleJob(name) {
     let job = this.queryScheduleJob(name);
     if (job !== undefined) {
       job.cancel()
     }
   },
-
-  // 根据任务名查询任务
+  // 根据任务名查询job
   queryScheduleJob(name) {
     return schedule.scheduledJobs[name];
   },
 
-  // 读文件
-  readFile(file) {
-    return fs.readFileSync(file, { encoding: 'utf-8' })
-  },
-  // 写文件
-  writeFile(filePath, content) {
-    return fs.writeFileSync(filePath, content, {
-      encoding: 'utf-8',
-      flag: 'w',
-    });
-  },
-  // 更新任务
-  updateTask(taskInfo) {
-    setItem('task-' + taskInfo.taskName, taskInfo);
-  },
-
-  // 更新脚本
-  updateScript(scriptInfo) {
-    setItem('script-' + scriptInfo.key, scriptInfo);
-  },
-
-  // 查询脚本信息
-  queryScriptInfo(scriptName) {
-    return getItem('script-' + scriptName);
-  },
-
+  /*********** 统计信息相关操作 ***********/
   totalSuccessPlus() {
     let successNum = this.getTotalSuccessNum();
     successNum += 1;
     setItem(SUCCESS_NUM, successNum);
     window.customEvents.fireEvent('totalSuccessUpdate', successNum);
   },
-
   totalFailPlus() {
     let failNum = this.getTotalFailNum();
     failNum += 1;
     setItem(FAIL_NUM, failNum);
     window.customEvents.fireEvent('totalFailUpdate', failNum);
   },
-
-    // 获取总成功调用次数
+  // 获取总成功调用次数
   getTotalSuccessNum() {
     let successNum = getItem(SUCCESS_NUM);
     return successNum ? successNum : 0;
   },
-
   getTotalFailNum() {
     let failNum = getItem(FAIL_NUM);
     return failNum ? failNum : 0;
   },
-
-  // 保存脚本
-  saveScript(scriptName, scriptInfo) {
-    setItem('script-' + scriptName, scriptInfo);
-    let scriptList = this.queryScriptList();
-    scriptList.push(scriptName)
-    this.saveScriptList(scriptList);
+  /*********** 文件读写操作 ***********/
+  readFile(file) {
+    return fs.readFileSync(file, { encoding: 'utf-8' })
   },
-
-  // 查询脚本列表
-  queryScriptList() {
-    const scriptList = getItem(KEY_SCRIPT_LIST);
-    return scriptList ? scriptList : [];
-  },
-
-  // 删除脚本
-  removeScript(scriptName) {
-    let scriptList = this.queryScriptList();
-    scriptList = scriptList.filter((name) => name !== scriptName);
-    this.saveScriptList(scriptList);
-    removeItem('script-' + scriptName);
-  },
-
-  // 保存脚本列表
-  saveScriptList(scriptList) {
-    setItem(KEY_SCRIPT_LIST, scriptList);
-  },
-
-  // 查询任务信息
-  queryTaskInfo(taskName) {
-    return getItem('task-' + taskName);
-  },
-
-  // 查询任务列表
-  queryTaskList() {
-    const taskList = getItem(KEY_TASK_LIST);
-    return taskList ? taskList : [];
-  },
-
-  // 保存任务
-  saveTask(taskInfo) {
-    setItem('task-' + taskInfo.taskName, taskInfo);
-    let taskList = this.queryTaskList();
-    taskList.push(taskInfo.taskName)
-    this.saveTaskList(taskList);
-    this.createScheduleJob(taskInfo);
-  },
-
-  // 删除任务
-  removeTask(taskName) {
-    this.delelteScheduleJob(taskName);
-    let taskList = this.queryTaskList();
-    taskList = taskList.filter((name) => name !== taskName );
-    this.saveTaskList(taskList);
-    removeItem('task-' + taskName);
-    // 删除相关日志
-    const dateList = this.queryTargetTaskDateList(taskName);
-    dateList.forEach((date) => {
-      let taskList = this.queryTargetDateTaskList(date);
-      taskList = taskList.filter((task) => task !== taskName);
-      setItem('logs-date-' + date, taskList);
-      removeItem('log-' + taskName + '-' + date);
+  writeFile(filePath, content) {
+    return fs.writeFileSync(filePath, content, {
+      encoding: 'utf-8',
+      flag: 'w',
     });
-    removeItem('logs-task' + taskName);
   },
-
-  saveTaskList(taskList) {
-    setItem(KEY_TASK_LIST, taskList);
-  },
-
 }
-
 
 function getExecutor(scriptType) {
   if (scriptType === 'python') {
@@ -380,5 +387,3 @@ function getExecutor(scriptType) {
     return 'C:\\ProGram Files\\Git\\usr\\bin\\bash.exe';
   }
 }
-
-

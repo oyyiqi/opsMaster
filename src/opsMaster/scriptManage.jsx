@@ -258,7 +258,7 @@ export default class ScriptManage extends Component {
               )}
               <Popconfirm
                 title={"删除脚本"}
-                description={"确认是否删除该脚本"}
+                description={"将同步删除相关任务，请确认是否删除"}
                 onConfirm={this.handleClickDelete}
                 okText={"是"}
                 cancelText={"否"}

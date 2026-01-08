@@ -27,7 +27,6 @@ export class AddScriptModal extends Component {
     let abbreviation = file.substring(start + 1);
     let scriptType = SCRIPT_TYPE.filter((item) => item.abbreviation === abbreviation)[0].type;
     let scriptList = services.queryScriptList();
-    console.log(scriptList)
     if (scriptList && scriptList.includes(scriptName)) {
       message.error("脚本名重复")
       return
@@ -39,8 +38,9 @@ export class AddScriptModal extends Component {
         content: fileContent,
         path: file,
         memo: scriptMemo,
+        task: [],
       }
-      services.saveScript(scriptName, scriptInfo);
+      services.saveScript(scriptInfo);
       this.props.renderNewScript(scriptInfo);
       this.props.handleAddModalCancel();
     }
