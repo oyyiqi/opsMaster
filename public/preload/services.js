@@ -14,12 +14,6 @@ const KEY_REAL_TIME_LOG = 'realTimeLog';
 const { getItem, setItem, removeItem } = window.utools.dbStorage;
 const { showNotification } = window.utools;
 const { createCustomWindow } = require('./utils/customWindow');
-const { ipcRenderer } = require('electron');
-
-ipcRenderer.on('closeWindow', (evenet, data) => {
-  console.log(evenet);
-  console.log(data);
-})
 
 const windowList = [];
 // 通过 window 对象向渲染进程注入 nodejs 能力
@@ -54,6 +48,7 @@ window.services = {
     }
   },
 
+  // 执行提醒任务
   executeRemindTask(taskInfo) {
     const job = this.queryScheduleJob(taskInfo.taskName);
     (job && job.nextInvocation()) ? taskInfo.status = 0 : taskInfo.status = 2;
@@ -61,18 +56,15 @@ window.services = {
     taskInfo.successNum += 1;
     this.updateTask(taskInfo);
     this.totalSuccessPlus();
-    // showNotification(taskInfo.taskName);
-    // window.customEvents.fireEvent("showMessageBox", taskInfo.taskName);
     if (windowList.length >= 10) {
       let dropWindow = windowList.shift();
       dropWindow.close();
     }
     const win = createCustomWindow(`simple-gradient-reminder.html?taskName=${taskInfo.taskName}`);
-    // const win = createCustomWindow(`reminderCard.html?content=${taskInfo.taskName}`);
     windowList.push(win);
   },
 
-  // 执行脚本
+  // 执行脚本任务
   executeScriptTask(taskInfo) {
     const {taskName, scriptName} = taskInfo;
     showNotification(`开始执行任务:${taskName}`, '日志管理');
@@ -126,28 +118,32 @@ window.services = {
     });
   },
 
+  // 单独执行脚本
   executeScript(scriptInfo) {
     const {key, type, path} = scriptInfo;
+    this.updateRealTimeLog('system', `开始执行脚本[${key}]\n`);
     const executor = getExecutor(type);
     const process = spawn(executor, [path]);
     // 监听标准输出流
     process.stdout.on('data', (data) => {
-      console.log(data.toString());
+      const logStr = iconv.decode(data, 'utf-8');
+      this.updateRealTimeLog(key, logStr);
     })
     // 监听标准错误流 (stderr)
     process.stderr.on('data', (data) => {
-      console.log(data.toString())
+      const logStr = iconv.decode(data, 'utf-8');
+      this.updateRealTimeLog(key, logStr);
     });
     // 监听进程错误 (例如：找不到 python 命令)
     process.on('error', (err) => {
-      console.error('执行进程时发生错误:', err);
+      this.updateRealTimeLog(key, err.toString());
     });
     // 监听进程退出
     process.on('close', (code) => {
       if (code !== 0) {
-        console.error(`脚本${scriptInfo.key}执行失败，退出码: ${code}`);
+        this.updateRealTimeLog('system', `脚本[${key}]执行失败\n`);
       } else {
-        console.log(`--- 脚本[${key} ${type}]执行成功 ---`);
+        this.updateRealTimeLog('system', `脚本[${key}]执行成功\n`);
       }
     });
   },
@@ -222,8 +218,12 @@ window.services = {
     let currentLog = this.queryTargetTaskAndDateLog(taskName, date);
     currentLog += content;
     setItem('log-' + taskName + '-' + date, currentLog);
+    this.updateRealTimeLog(taskName, content);
+  },
+
+  updateRealTimeLog(title, content) {
     let realTimeLog = this.queryRealTimeLog();
-    realTimeLog += '[' + taskName + ']:' + content;
+    realTimeLog += '[' + title + ']:' + content;
     setItem(KEY_REAL_TIME_LOG, realTimeLog);
     window.customEvents.fireEvent('realTimeLogUpdate', realTimeLog);
   },
@@ -250,10 +250,21 @@ window.services = {
   readFile(file) {
     return fs.readFileSync(file, { encoding: 'utf-8' })
   },
-
+  // 写文件
+  writeFile(filePath, content) {
+    return fs.writeFileSync(filePath, content, {
+      encoding: 'utf-8',
+      flag: 'w',
+    });
+  },
   // 更新任务
   updateTask(taskInfo) {
     setItem('task-' + taskInfo.taskName, taskInfo);
+  },
+
+  // 更新脚本
+  updateScript(scriptInfo) {
+    setItem('script-' + scriptInfo.key, scriptInfo);
   },
 
   // 查询脚本信息
@@ -286,6 +297,7 @@ window.services = {
     return failNum ? failNum : 0;
   },
 
+  // 保存脚本
   saveScript(scriptName, scriptInfo) {
     setItem('script-' + scriptName, scriptInfo);
     let scriptList = this.queryScriptList();
@@ -293,11 +305,13 @@ window.services = {
     this.saveScriptList(scriptList);
   },
 
+  // 查询脚本列表
   queryScriptList() {
     const scriptList = getItem(KEY_SCRIPT_LIST);
     return scriptList ? scriptList : [];
   },
 
+  // 删除脚本
   removeScript(scriptName) {
     let scriptList = this.queryScriptList();
     scriptList = scriptList.filter((name) => name !== scriptName);
@@ -305,19 +319,23 @@ window.services = {
     removeItem('script-' + scriptName);
   },
 
+  // 保存脚本列表
   saveScriptList(scriptList) {
     setItem(KEY_SCRIPT_LIST, scriptList);
   },
 
+  // 查询任务信息
   queryTaskInfo(taskName) {
     return getItem('task-' + taskName);
   },
 
+  // 查询任务列表
   queryTaskList() {
     const taskList = getItem(KEY_TASK_LIST);
     return taskList ? taskList : [];
   },
 
+  // 保存任务
   saveTask(taskInfo) {
     setItem('task-' + taskInfo.taskName, taskInfo);
     let taskList = this.queryTaskList();
@@ -326,6 +344,7 @@ window.services = {
     this.createScheduleJob(taskInfo);
   },
 
+  // 删除任务
   removeTask(taskName) {
     this.delelteScheduleJob(taskName);
     let taskList = this.queryTaskList();

@@ -8,6 +8,7 @@ import {
   CheckOutlined,
   CloseOutlined,
   PlusOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import {
   Button,
@@ -23,7 +24,7 @@ import { Component } from "react";
 import "./dark.less";
 import "./common.less";
 import { AddScriptModal } from "./addScriptModal";
-import { SCRIPT_TYPE } from "./const.js";
+import { APP_FUNCS, SCRIPT_TYPE } from "./const.js";
 const { services } = window;
 const { TextArea } = Input;
 export default class ScriptManage extends Component {
@@ -34,6 +35,7 @@ export default class ScriptManage extends Component {
       selectedItem: {},
       isReadOnly: true,
       showAddScriptModal: false,
+      tempContent: '',
     };
   }
 
@@ -65,15 +67,21 @@ export default class ScriptManage extends Component {
   };
 
   handleClickEdit = () => {
-    this.setState({ isReadOnly: !this.state.isReadOnly });
+    this.setState({ isReadOnly: !this.state.isReadOnly, tempContent: this.state.selectedItem.content });
   };
 
   handleClickSave = () => {
+    const { selectedItem } = this.state;
+    services.writeFile(selectedItem.path, selectedItem.content)
     this.setState({ isReadOnly: true });
+    message.success('修改成功');
   };
 
   handleClickCancel = () => {
-    this.setState({ isReadOnly: true });
+    const { selectedItem } = this.state;
+    selectedItem.content = this.state.tempContent;
+    this.setState({ isReadOnly: true, selectedItem });
+    
   };
 
   handleClickAdd = () => {
@@ -82,7 +90,9 @@ export default class ScriptManage extends Component {
   };
 
   handleTextAreaChange = (e) => {
-    console.log(e.target.value);
+    const { selectedItem } = this.state;
+    selectedItem.content = e.target.value;
+    this.setState({ selectedItem });
   };
 
   handleClickDelete = () => {
@@ -98,9 +108,21 @@ export default class ScriptManage extends Component {
   };
 
   handleClickRun = () => {
-    window.services.executeScript(this.state.selectedItem);
+    window.customEvents.fireEvent('swichMenu', APP_FUNCS.LOG_MANAGE);
+    services.executeScript(this.state.selectedItem);
   };
 
+  // 重新加载脚本
+  handleClickReload = () => {
+    const { selectedItem } = this.state;
+    const fileContent = services.readFile(selectedItem.path);
+    selectedItem.content = fileContent;
+    services.updateScript(selectedItem);
+    this.setState({selectedItem});
+    message.success("重新加载脚本成功");
+  }
+
+  // 渲染新脚本
   renderNewScript = (newScript) => {
     let { items } = this.state;
     items.push(newScript);
@@ -190,6 +212,15 @@ export default class ScriptManage extends Component {
                   icon={<CaretRightOutlined />}
                   style={{ marginRight: 8 }}
                   onClick={this.handleClickRun}
+                ></Button>
+              </Tooltip>
+              <Tooltip title="刷新脚本">
+                <Button
+                  type="primary"
+                  shape="circle"
+                  icon={<ReloadOutlined />}
+                  style={{ marginRight: 8 }}
+                  onClick={this.handleClickReload}
                 ></Button>
               </Tooltip>
               {this.state.isReadOnly && (

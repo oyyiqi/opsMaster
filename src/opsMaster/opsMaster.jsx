@@ -8,7 +8,6 @@ import { LayoutDashboard, FileCode, CalendarClock, ScrollText, Settings, Activit
 import { APP_FUNCS } from "./const";
 import DataPanel from "./dataPanel";
 import LogManage from "./logManage";
-import MessageBox from "./messageBox";
 const { Sider } = Layout;
 
 
@@ -33,7 +32,6 @@ class OpsMaster extends Component {
     }
   }
 
-
   componentDidMount() {
     this.setState({selectedKey: this.props.defaultSelectedKey});
     const allDocs = window.utools.db.allDocs();
@@ -41,29 +39,15 @@ class OpsMaster extends Component {
     // this.clearAllData();
     window.services.resignTask();
     window.services.clearRealTimeLog();
-    window.customEvents.addEvent("showMessageBox", this.handleShowMessageBox);
+    window.customEvents.addEvent("swichMenu", this.handleSwichMenuEvent);
   }
 
   componentWillUnmount() {
-    window.customEvents.removeEvent("showMessageBox", this.handleShowMessageBox);
+    window.customEvents.removeEvent("swichMenu", this.handleSwichMenuEvent);
   }
   
-  handleShowMessageBox = (message) => {
-    utools.createBrowserWindow('modal.html', {
-        width: 360,      // 窗口宽度
-        height: 200,     // 窗口高度
-        x: screen.width / 2 - 180, // 右下角定位
-        y: screen.height / 2 - 160,
-        frame: false,    // 无边框
-        transparent: false, // 透明背景
-        alwaysOnTop: true, // 置顶
-        resizable: false,  // 禁止调整大小
-        skipTaskbar: true, // 任务栏不显示
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false
-        }
-    })
+  handleSwichMenuEvent = (key) => {
+    this.setState( { selectedKey: key});
   }
 
   clearAllData = () => {
@@ -82,7 +66,7 @@ class OpsMaster extends Component {
   }
 
   render() {
-    const { selectedKey,showMessageBox } = this.state;
+    const { selectedKey } = this.state;
     return (
       <Layout style={{ minHeight: "100vh" }}>
         <Sider width={180}>
@@ -106,7 +90,6 @@ class OpsMaster extends Component {
         {selectedKey === APP_FUNCS.SCRIPT_MANAGE  && <ScriptManage></ScriptManage>}
         {selectedKey === APP_FUNCS.TASK_MANAGE && <TaskManage></TaskManage>}
         {selectedKey === APP_FUNCS.LOG_MANAGE && <LogManage></LogManage>}
-        {/* {showMessageBox && <MessageBox></MessageBox>} */}
       </Layout>
     );
   }
