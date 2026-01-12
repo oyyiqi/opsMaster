@@ -372,7 +372,7 @@ export function parseSchedule(scheduleStr) {
         throw new Error(`非法范围：${item}（${config.name}字段，需符合${config.min}-${config.max}且起始≤结束）`);
       }
       return config.name === '周' 
-        ? `${config.alias[start]}-${config.alias[end]}` // 周范围：一-三
+        ? `${config.alias[start]}~${config.alias[end]}` // 周范围：一-三
         : `${start}-${end}${config.alias}`; // 其他范围：1-3号、1-3月
     }
 

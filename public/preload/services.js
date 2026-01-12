@@ -7,6 +7,11 @@ const iconv = require('iconv-lite');
 const KEY_TASK_LIST = 'taskList'
 const KEY_SCRIPT_LIST = 'scriptList'
 const KEY_LOG_DATES = 'logDates';
+const KEY_TODAY_ACTIVITIES = 'todayActivities'
+const KEY_SYSTEM_DATE = 'systemDate'
+const DEFAULT_REMINDER_STYLE = 'simple-gradient';
+const DEFAULT_REMINDER_WIDTH = 360;
+const DEFAULT_REMINDER_HEIGHT = 300;
 const SUCCESS_NUM = 'successNum';
 const FAIL_NUM = 'failNum';
 const SCRIPT_TASK = '脚本任务';
@@ -14,6 +19,15 @@ const KEY_REAL_TIME_LOG = 'realTimeLog';
 const { getItem, setItem, removeItem } = window.utools.dbStorage;
 const { showNotification } = window.utools;
 const { createCustomWindow } = require('./utils/customWindow');
+const REMINDER_LOCATION = {
+  MIDDLE: '中间',
+  LEFT_TOP: '左上',
+  RIGHT_TOP: '右上',
+  MIDDLE_TOP: '中上',
+  LEFT_BOTTOM: '左下',
+  RIGHT_BOTTOM: '右下',
+  MIDDLE_BOTTOM: '中下',
+}
 const windowList = [];
 // 通过 window 对象向渲染进程注入 nodejs 能力
 window.services = {
@@ -98,7 +112,7 @@ window.services = {
       setItem('logs-date-' + date, taskList);
       removeItem('log-' + taskName + '-' + date);
     });
-    removeItem('logs-task' + taskName);
+    removeItem('logs-task-' + taskName);
     // 删除任务与脚本的关联
     if (taskInfo.taskType === SCRIPT_TASK) {
         let scriptInfo = this.queryScriptInfo(taskInfo.scriptName);
@@ -124,8 +138,9 @@ window.services = {
   },
   // 更新实时日志
   updateRealTimeLog(title, content) {
+    const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
     let realTimeLog = this.queryRealTimeLog();
-    realTimeLog += '[' + title + ']:' + content;
+    realTimeLog += `[${now} ${title}]：${content}`
     setItem(KEY_REAL_TIME_LOG, realTimeLog);
     window.customEvents.fireEvent('realTimeLogUpdate', realTimeLog);
   },
@@ -181,6 +196,68 @@ window.services = {
     // 日志内容更新到实时日志中
     this.updateRealTimeLog(taskName, content);
   },
+  getTodayActivities() {
+    return getItem(KEY_TODAY_ACTIVITIES);
+  },
+  // 更新今日活动
+  updateTodayActivities(taskType, taskName, status) {
+    const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
+    let newActivity = `[${now} ${taskType}-${taskName}] ${status} \n`
+    let todayActivities = getItem(KEY_TODAY_ACTIVITIES);
+    todayActivities += newActivity;
+    setItem(KEY_TODAY_ACTIVITIES, todayActivities);
+  },
+  // 记录任务开始
+  recordTaskStart(taskInfo) {
+    const {taskType, taskName} = taskInfo;
+    this.updateTodayActivities(taskType, taskName, '开始');
+    // this.updateRealTimeLog('system', `开始执行任务[${taskName}]\n`);
+    taskInfo.status = 1;
+    this.updateTask(taskInfo);
+    showNotification(`开始执行任务:${taskName}`, '日志管理');
+
+  },
+  // 记录任务完成
+  recordTaskFinish(taskInfo) {
+    const {taskType, taskName} = taskInfo;
+    this.updateTodayActivities(taskType, taskName, '完成');
+    this.totalSuccessPlus();
+    const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
+    taskInfo.successNum += 1;
+    taskInfo.lastExecuteTime = now;
+    const job = this.queryScheduleJob(taskName);
+    if (job === undefined) {
+      taskInfo.status = 2;
+    } else {
+      taskInfo.status = 0;
+    }
+    this.updateTask(taskInfo);
+    if (taskType === SCRIPT_TASK) {
+      // this.updateRealTimeLog('system', `任务[${taskName}]执行完成\n`);
+      showNotification(`任务[${taskName}]执行完成`, '日志管理');
+    } else {
+      this.popupWindow(taskInfo);
+    }
+  },
+  // 记录任务失败
+  recordTaskFail(taskInfo) {
+    const {taskType, taskName} = taskInfo;
+    this.updateTodayActivities(taskType, taskName, '失败');
+    // this.updateRealTimeLog('system', `任务[${taskName}]执行失败\n`);
+    this.totalFailPlus();
+    const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
+    taskInfo.failNum += 1;
+    taskInfo.lastFailTime = now;
+    taskInfo.lastExecuteTime = now;
+    const job = this.queryScheduleJob(taskName);
+    if (job === undefined) {
+      taskInfo.status = 2;
+    } else {
+      taskInfo.status = 0;
+    }
+    this.updateTask(taskInfo);
+    showNotification(`任务[${taskName}]执行失败`, '日志管理');
+  },
   /*********** 调度任务相关操作 ***********/
     // 创建计划任务
   createScheduleJob(taskInfo) {
@@ -216,26 +293,18 @@ window.services = {
     const job = this.queryScheduleJob(taskInfo.taskName);
     (job && job.nextInvocation()) ? taskInfo.status = 0 : taskInfo.status = 2;
     taskInfo.lastExecuteTime =  moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
-    taskInfo.successNum += 1;
     this.updateTask(taskInfo);
     this.totalSuccessPlus();
-    if (windowList.length >= 10) {
-      let dropWindow = windowList.shift();
-      dropWindow.close();
-    }
-    const win = createCustomWindow(`simple-gradient-reminder.html?taskName=${taskInfo.taskName}`);
-    windowList.push(win);
+    this.recordTaskFinish(taskInfo);
   },
   // 执行脚本任务
   executeScriptTask(taskInfo) {
     const {taskName, scriptName} = taskInfo;
-    showNotification(`开始执行任务:${taskName}`, '日志管理');
     if (taskInfo.status === 1) {
       console.log('任务正在执行，跳过此次执行');
       return;
     }
-    taskInfo.status = 1;
-    this.updateTask(taskInfo);
+    this.recordTaskStart(taskInfo);
     const scriptInfo = this.queryScriptInfo(scriptName);
     const {key, type, path} = scriptInfo;
     const executor = getExecutor(type);
@@ -253,26 +322,11 @@ window.services = {
     // 监听进程退出
     process.on('close', (code) => {
       let taskInfo = this.queryTaskInfo(taskName);
-      const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
-      taskInfo.lastExecuteTime = now;
       if (code !== 0) {
-        console.error(`脚本${scriptInfo.key}执行失败，退出码: ${code}`);
-        taskInfo.failNum += 1;
-        taskInfo.lastFailTime = now;
-        this.totalFailPlus();
+        this.recordTaskFail(taskInfo);
       } else {
-        this.totalSuccessPlus();
-        taskInfo.successNum += 1;
-        console.log(`--- 脚本[${key} ${type}]执行成功 ---`);
+        this.recordTaskFinish(taskInfo);
       }
-      const job = this.queryScheduleJob(taskName);
-      if (job === undefined) {
-        taskInfo.status = 2;
-      } else {
-        taskInfo.status = 0;
-      }
-      this.updateTask(taskInfo);
-      showNotification(`任务执行完成:${taskName}`, '日志管理');
     });
     // 监听进程错误 (例如：找不到 python 命令)
     process.on('error', (err) => {
@@ -374,6 +428,30 @@ window.services = {
       flag: 'w',
     });
   },
+  /*********** 其他 ***********/
+  changeSystemDate() {
+    const currentDate = moment(new Date()).format('YYYY-MM-DD');
+    let systemDate = getItem(KEY_SYSTEM_DATE);
+    if (currentDate !== systemDate) {
+      // 更新系统日期并清空历史活动和实时日志
+      setItem(KEY_SYSTEM_DATE, currentDate);
+      setItem(KEY_TODAY_ACTIVITIES, '');
+      setItem(KEY_REAL_TIME_LOG, '');
+    }
+  },
+  // 弹窗
+  popupWindow(taskInfo, src='simple-gradient-reminder.html') {
+    let { reminderLocation, reminderStyle } = taskInfo;
+    reminderLocation = reminderLocation ? reminderLocation : REMINDER_LOCATION.MIDDLE;
+    reminderStyle = reminderStyle ? reminderStyle : DEFAULT_REMINDER_STYLE
+    const xy = calculateXY(reminderLocation)
+    if (windowList.length >= 10) {
+      let dropWindow = windowList.shift();
+      dropWindow.close();
+    }
+    const win = createCustomWindow(`${reminderStyle}.html?taskName=${taskInfo.taskName}`, {...xy});
+    windowList.push(win);
+  },
 }
 
 function getExecutor(scriptType) {
@@ -385,5 +463,27 @@ function getExecutor(scriptType) {
   }
   if (scriptType === 'shell') {
     return 'C:\\ProGram Files\\Git\\usr\\bin\\bash.exe';
+  }
+}
+
+function calculateXY(location) {
+  console.log(screen.width)
+  console.log(screen.height)
+  if (location === REMINDER_LOCATION.LEFT_TOP) {
+    return {x: 0, y: 0}
+  } else if (location === REMINDER_LOCATION.LEFT_BOTTOM) {
+    return {x: 0, y: screen.height - DEFAULT_REMINDER_HEIGHT}
+  } else if (location === REMINDER_LOCATION.RIGHT_BOTTOM) {
+    return {x: screen.width - DEFAULT_REMINDER_WIDTH, y: screen.height - DEFAULT_REMINDER_HEIGHT}
+  } else if (location === REMINDER_LOCATION.RIGHT_TOP) {
+    return {x: screen.width - DEFAULT_REMINDER_WIDTH, y: 0}
+  } else if (location === REMINDER_LOCATION.MIDDLE_BOTTOM) {
+    return {x: screen.width / 2 - DEFAULT_REMINDER_WIDTH/2, y: screen.height - DEFAULT_REMINDER_HEIGHT}
+  } else if (location === REMINDER_LOCATION.MIDDLE_TOP) {
+    return {x: screen.width / 2 - DEFAULT_REMINDER_WIDTH/2, y: 0}
+  } else if (location === REMINDER_LOCATION.MIDDLE) {
+    return {x: screen.width / 2 - DEFAULT_REMINDER_WIDTH / 2, y: screen.height / 2  - DEFAULT_REMINDER_HEIGHT / 2}
+  } else {
+    return {x: screen.width / 2 - DEFAULT_REMINDER_WIDTH / 2, y: screen.height / 2 - DEFAULT_REMINDER_HEIGHT / 2}
   }
 }

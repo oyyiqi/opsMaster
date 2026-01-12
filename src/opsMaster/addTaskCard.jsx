@@ -1,63 +1,131 @@
-import { Row, Col, Form, Input, Select, DatePicker, TimePicker, Flex, Button, message } from "antd";
+import {
+  Row,
+  Col,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  TimePicker,
+  Flex,
+  Button,
+  message,
+  Modal,
+} from "antd";
 import { Option } from "antd/es/mentions";
 import React, { Component } from "react";
-import { SCHEDULE_TYPE, DAY_OF_WEEK, DAY_OF_MONTH, TASK_TYPE, SCRIPT_TYPE  } from "./const.js";
-import {buildCronExpression, is6BitCronValid } from "./util.js";
+import {
+  SCHEDULE_TYPE,
+  DAY_OF_WEEK,
+  DAY_OF_MONTH,
+  TASK_TYPE,
+  SCRIPT_TYPE,
+  REMINDER_LOCATION,
+  REMINDER_STYLE,
+} from "./const.js";
+import { buildCronExpression, is6BitCronValid } from "./util.js";
+import dayjs from "dayjs";
 
 const { services } = window;
-const {ONE_TIME, DAYLY, WEEKLY, MONTHLY, CUSTOM} = SCHEDULE_TYPE;
+const { ONE_TIME, DAYLY, WEEKLY, MONTHLY, CUSTOM } = SCHEDULE_TYPE;
 
 export default class AddTaskCard extends Component {
-
   constructor(props) {
     super(props);
     this.state = {
       scriptList: [],
       scheduleType: SCHEDULE_TYPE.ONE_TIME,
-      selectScriptDisable: true,
-    }
+    };
     this.formRef = React.createRef();
   }
 
   componentDidMount() {
-    const scriptList = services.queryScriptList()
-    this.setState({ scriptList })
+    this.init();
   }
+
+  componentWillUnmount() {
+    this.formRef.current.resetFields();
+  }
+
+  init = () => {
+    const { taskInfo, mode } = this.props;
+    console.log(mode);
+    if (mode === "update") {
+      this.setState({ scheduleType: taskInfo.scheduleType });
+      if (taskInfo.executeDateTime) {
+        taskInfo.executeDateTime = dayjs(taskInfo.executeDateTime.$d);
+      }
+      if (taskInfo.executeTime) {
+        taskInfo.executeTime = dayjs(taskInfo.executeTime.$d);
+      }
+      this.formRef.current.setFieldsValue(taskInfo);
+    }
+    const scriptList = services.queryScriptList();
+    this.setState({ scriptList });
+  };
 
   handleSelectChange = (key) => {
-    this.setState({scheduleType: key})
-  }
+    this.setState({ scheduleType: key });
+  };
 
   handleClickSubmit = () => {
+    if (this.props.mode === "update") {
+      this.handleModifyTask();
+      message.success("修改任务成功");
+      this.props.refreshPage();
+      this.props.closeNewPlan();
+      return;
+    }
     const values = this.formRef.current.getFieldsValue();
+    console.log(values);
     let taskList = services.queryTaskList();
     if (taskList && taskList.includes(values.taskName)) {
-      message.error('任务名称重复');
+      message.error("任务名称重复");
       return;
     }
     let executeSchedule = this.getExecuteSchedule(values);
     // 注册任务
     try {
       let taskInfo = {
-        taskName: values.taskName,
-        taskType: values.taskType,
+        taskType: this.props.taskType,
         executeSchedule,
-        scriptName: values.scriptName,
         successNum: 0,
         failNum: 0,
         lastFailTime: null,
-        lastExecuteTime: '当前没有执行信息',
+        lastExecuteTime: "当前没有执行信息",
         status: 0,
-      }
+        reminderLocation: values.reminderLocation,
+        reminderStyle: values.reminderStyle,
+        taskName: values.taskName,
+        scriptName: values.scriptName,
+        ...values,
+      };
       services.saveTask(taskInfo);
       this.props.refreshPage();
       this.props.closeNewPlan();
-      message.success('添加任务成功！');
+      message.success("添加任务成功！");
     } catch (e) {
-      console.error(e)
-      message.error('添加任务失败');
+      console.error(e);
+      message.error("添加任务失败");
     }
-  }
+  };
+
+  handleModifyTask = () => {
+    const oldTaskInfo = this.props.taskInfo;
+    const values = this.formRef.current.getFieldsValue();
+    let executeSchedule = this.getExecuteSchedule(values);
+    let newTaskInfo = {
+      taskType: oldTaskInfo.taskType,
+      successNum: oldTaskInfo.successNum,
+      failNum: oldTaskInfo.failNum,
+      lastFailTime: oldTaskInfo.lastFailTime,
+      lastExecuteTime: oldTaskInfo.lastExecuteTime,
+      status: 0,
+      executeSchedule,
+      ...values,
+    };
+    services.removeTask(oldTaskInfo.taskName);
+    services.saveTask(newTaskInfo);
+  };
 
   getExecuteSchedule(formData) {
     if (formData.scheduleType === ONE_TIME) {
@@ -67,8 +135,8 @@ export default class AddTaskCard extends Component {
       if (is6BitCronValid(inputCron)) {
         return inputCron;
       } else {
-        message.error('非法的Cron表达式');
-        throw new Error('非法的Cron表达式');
+        message.error("非法的Cron表达式");
+        throw new Error("非法的Cron表达式");
       }
     } else {
       const executeTime = formData.executeTime;
@@ -84,109 +152,185 @@ export default class AddTaskCard extends Component {
     }
   }
 
-  handleTaskTypeChange = (value) => {
-    if (value === TASK_TYPE.REMIND_TASK) {
-      this.formRef.current.setFieldValue('scriptName', '');
-    }
-    this.setState({selectScriptDisable: !this.state.selectScriptDisable})
-  }
-
-
-
   render() {
     const { scheduleType } = this.state;
+    const { taskType } = this.props;
     return (
-      <div className="newTaskCard">
-        <div className="large-font" style={{ marginBottom: '10px' }}>配置新任务</div>
-        <Form layout="vertical" ref={this.formRef} onFinish={this.handleClickSubmit}>
-          <Row gutter={15}>
+      <Modal
+        open={true}
+        title={this.props.mode === "update" ? "修改任务" : "新任务"}
+        style={{ top: 40 }}
+        footer={null}
+        onCancel={this.props.closeNewPlan}
+      >
+        <Form
+          layout="vertical"
+          ref={this.formRef}
+          onFinish={this.handleClickSubmit}
+        >
+          <Row gutter={15} wrap="true">
             <Col span={8}>
-              <Form.Item rules={[{ required: true, message: '必填' }]} label={'任务类型'} name={'taskType'} initialValue={TASK_TYPE.REMIND_TASK}>
-                <Select onChange={this.handleTaskTypeChange}>
-                  {
-                    Object.values(TASK_TYPE).map((value) => (
+              <Form.Item
+                rules={[{ required: true, message: "必填" }]}
+                label={"任务名称"}
+                name={"taskName"}
+              >
+                <Input></Input>
+              </Form.Item>
+            </Col>
+            {taskType === TASK_TYPE.REMIND_TASK && (
+              <Col span={8}>
+                <Form.Item
+                  label={"弹窗位置"}
+                  name={"reminderLocation"}
+                  initialValue={REMINDER_LOCATION.MIDDLE}
+                >
+                  <Select>
+                    {Object.values(REMINDER_LOCATION).map((value) => (
                       <Option value={value}>{value}</Option>
-                    ))
-                  }
-                </Select>
-              </Form.Item>
-            </Col>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            )}
+            {taskType === TASK_TYPE.REMIND_TASK && (
+              <Col span={8}>
+                <Form.Item
+                  label={"弹窗风格"}
+                  name={"reminderStyle"}
+                  initialValue={REMINDER_STYLE[0]}
+                >
+                  <Select>
+                    {REMINDER_STYLE.map((value) => (
+                      <Option value={value}>{value}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            )}
+            {taskType === TASK_TYPE.SCRIPT_TASK && (
+              <Col span={8}>
+                <Form.Item
+                  rules={[{ required: true, message: "必填" }]}
+                  label={"执行脚本"}
+                  name={"scriptName"}
+                >
+                  <Select>
+                    {this.state.scriptList.map((scriptName) => (
+                      <Option value={scriptName}>{scriptName}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            )}
             <Col span={8}>
-              <Form.Item rules={[{ required: true, message: '必填' }]} label={'任务名称'} name={'taskName'}>
-                <Input ></Input>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item rules={[{ required: !this.state.selectScriptDisable, message: '必填' }]}  label={'执行脚本'} name={'scriptName'}>
-                <Select disabled={this.state.selectScriptDisable}>
-                  {this.state.scriptList.map((scriptName) => (
-                    <Option value={scriptName}>{scriptName}</Option>
+              <Form.Item
+                initialValue={SCHEDULE_TYPE.ONE_TIME}
+                rules={[{ required: true, message: "必填" }]}
+                label={"计划类型"}
+                name={"scheduleType"}
+              >
+                <Select
+                  placeholder={"请选择计划类型"}
+                  onSelect={this.handleSelectChange}
+                >
+                  {Object.values(SCHEDULE_TYPE).map((item) => (
+                    <Option value={item}>{item}</Option>
                   ))}
                 </Select>
               </Form.Item>
             </Col>
-          </Row>
-          <Row gutter={15}>
-            <Col span={8}>
-              <Form.Item initialValue={SCHEDULE_TYPE.ONE_TIME} rules={[{ required: true, message: '必填' }]} label={'计划类型'} name={'scheduleType'}>
-                <Select
-                  placeholder={'请选择计划类型'}
-                  onSelect={this.handleSelectChange}
+            {scheduleType === ONE_TIME && (
+              <Col span={8}>
+                <Form.Item
+                  label={"执行时间"}
+                  rules={[{ required: true, message: "必填" }]}
+                  name={"executeDateTime"}
                 >
-                  {Object.values(SCHEDULE_TYPE).map((item) =>
-                    <Option value={item}>{item}</Option>
-                  )}
-                </Select>
-              </Form.Item>
-            </Col>
-            {scheduleType === ONE_TIME &&
-              <Col span={8}>
-                <Form.Item label={'执行时间'} rules={[{ required: true, message: '必填' }]} name={'executeDateTime'}>
-                  <DatePicker style={{width: '100%'}} placeholder="请选择执行时间" showTime={true}></DatePicker>
+                  <DatePicker
+                    style={{ width: "100%" }}
+                    placeholder="请选择执行时间"
+                    showTime={true}
+                  ></DatePicker>
                 </Form.Item>
-              </Col>}
-            {scheduleType === WEEKLY &&
+              </Col>
+            )}
+            {scheduleType === WEEKLY && (
               <Col span={8}>
-                <Form.Item label={'执行日'} rules={[{ required: true, message: '必填' }]} name={'dayOfWeek'}>
+                <Form.Item
+                  label={"执行日"}
+                  rules={[{ required: true, message: "必填" }]}
+                  name={"dayOfWeek"}
+                >
                   <Select placeholder="请选择执行日">
                     {DAY_OF_WEEK.map((item) => (
                       <Option value={item.key}>{item.value}</Option>
                     ))}
                   </Select>
                 </Form.Item>
-              </Col>}
-            {scheduleType === MONTHLY &&
+              </Col>
+            )}
+            {scheduleType === MONTHLY && (
               <Col span={8}>
-                <Form.Item label={'执行日'} rules={[{ required: true, message: '必填' }]} name={'dayOfMonth'}>
+                <Form.Item
+                  label={"执行日"}
+                  rules={[{ required: true, message: "必填" }]}
+                  name={"dayOfMonth"}
+                >
                   <Select placeholder="请选择执行日">
                     {DAY_OF_MONTH.map((item) => (
                       <Option value={item}>{item}</Option>
                     ))}
                   </Select>
                 </Form.Item>
-              </Col>}
-            {[DAYLY, WEEKLY, MONTHLY].includes(scheduleType) &&
+              </Col>
+            )}
+            {[DAYLY, WEEKLY, MONTHLY].includes(scheduleType) && (
               <Col span={8}>
-                <Form.Item label={'执行时间'} rules={[{ required: true, message: '必填' }]} name={'executeTime'}>
-                  <TimePicker placeholder="请选择执行时间" style={{width: '100%'}} ></TimePicker>
+                <Form.Item
+                  label={"执行时间"}
+                  rules={[{ required: true, message: "必填" }]}
+                  name={"executeTime"}
+                >
+                  <TimePicker
+                    placeholder="请选择执行时间"
+                    style={{ width: "100%" }}
+                  ></TimePicker>
                 </Form.Item>
-              </Col>}
-            { scheduleType === CUSTOM &&
+              </Col>
+            )}
+            {scheduleType === CUSTOM && (
               <Col span={8}>
-                <Form.Item label={'自定义执行计划'} rules={[{ required: true, message: '必填' }]} name={'cronString'}>
+                <Form.Item
+                  label={"自定义执行计划"}
+                  rules={[{ required: true, message: "必填" }]}
+                  name={"cronString"}
+                >
                   <Input placeholder="支持6位cron表达式"></Input>
                 </Form.Item>
               </Col>
-            }
+            )}
           </Row>
-          <Row dir='rtl' gutter={15} style={{marginTop: '10px'}}>
-            <Col span={12} >
-              <Button style={{ width: '40%', marginLeft: '10px' }} type="primary" htmlType="submit">提交</Button>
-              <Button style={{ width: '40%' }} type="default" onClick={this.props.closeNewPlan}>取消</Button>
+          <Row dir="rtl" gutter={15} style={{ marginTop: "10px" }}>
+            <Col span={12}>
+              <Button
+                style={{ width: "40%", marginLeft: "10px" }}
+                type="primary"
+                htmlType="submit"
+              >
+                提交
+              </Button>
+              <Button
+                style={{ width: "40%" }}
+                type="default"
+                onClick={this.props.closeNewPlan}
+              >
+                取消
+              </Button>
             </Col>
           </Row>
         </Form>
-      </div>
-    )
+      </Modal>
+    );
   }
 }

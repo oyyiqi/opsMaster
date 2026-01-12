@@ -1,4 +1,4 @@
-import { message, Button, Tag, Popconfirm, Tooltip, Collapse, Modal  } from "antd";
+import { message, Button, Tag, Popconfirm, Tooltip, Collapse, Modal, Flex, Row, Col  } from "antd";
 import {
   PlusCircleOutlined,
   CaretRightOutlined,
@@ -12,12 +12,14 @@ import {
   CheckCircleOutlined,
   SyncOutlined,
   ClockCircleOutlined,
+  RedoOutlined
 } from "@ant-design/icons";
+import { ClockPlus } from 'lucide-react';
 import { Component } from "react";
 import './common.less'
 import './dark.less'
 import AddTaskCard from "./addTaskCard";
-import { SCRIPT_TYPE, TASK_STATUS, TASK_TYPE } from "./const";
+import { REMINDER_LOCATION, REMINDER_STYLE, SCRIPT_TYPE, TASK_STATUS, TASK_TYPE } from "./const";
 // import { services.queryScriptInfo, services.queryTaskInfo, services.queryTaskList, services.removeTask, parseSchedule } from "./util";
 import { parseSchedule } from "./util";
 
@@ -27,6 +29,8 @@ export default class TaskManage extends Component {
     super(props);
     this.state = {
       showNewPlan: false,
+      taskType: '',
+      taskInfo: {},
       taskList: [],
       items: [],
     }
@@ -97,6 +101,8 @@ export default class TaskManage extends Component {
       displayInfo.executeSchedule = parseSchedule(executeSchedule);
       displayInfo.successNum = taskInfo.successNum;
       displayInfo.failNum = taskInfo.failNum;
+      displayInfo.reminderLocation = taskInfo.reminderLocation;
+      displayInfo.reminderStyle = taskInfo.reminderStyle;
       if (status === '就绪') {
         displayInfo.color = 'warning'
         displayInfo.icon = <ClockCircleOutlined />
@@ -112,12 +118,36 @@ export default class TaskManage extends Component {
       }
       const item = {
         key: taskName,
-        label: <div className="left-right-layout" style={{marginBottom: '0px'}}
-        >
+        label: <div className="left-right-layout" style={{marginBottom: '0px'}}>
             <div style={{ marginBottom: '0px' }} className="large-font">
-              {/* <span style={{marginRight: '20px'}}>{ status === '已完成' ? <del>{'任务名称：' + displayInfo.taskName}</del> : '任务名称：' + displayInfo.taskName}</span> */}
-              <span style={{marginRight: '20px'}}>{displayInfo.taskName}</span>
-              <Tag color={displayInfo.color} icon={displayInfo.icon} variant="filled" >{displayInfo.status}</Tag>
+              <span style={{marginRight: '10px'}}>{displayInfo.taskName}</span>
+              <Tooltip title={'任务状态'}>
+                <Tag style={{marginRight: '5px'}} color={displayInfo.color} icon={displayInfo.icon} variant="filled" >
+                  {displayInfo.status}
+                </Tag>
+              </Tooltip>
+              <Tooltip title={'任务类型'}>
+                <Tag variant="filled" style={{marginRight: '5px'}}>
+                  {displayInfo.taskType}
+                </Tag>
+              </Tooltip>
+              { displayInfo.taskType === TASK_TYPE.SCRIPT_TASK &&
+              <Tooltip title={'脚本名称'}>
+                <Tag variant="filled" style={{marginRight: '5px'}}>
+                  {displayInfo.scriptName}
+                </Tag>
+              </Tooltip>}
+              <Tooltip title={'执行计划'}>
+                <Tag variant="filled" style={{marginRight: '5px'}}>
+                  {displayInfo.executeSchedule}
+                  </Tag>
+              </Tooltip>
+              { !taskFinished && 
+              <Tooltip title={'下次执行时间'}>
+                <Tag variant="filled" style={{marginRight: '5px'}}>
+                  {displayInfo.nextExecuteTime}
+                </Tag>
+              </Tooltip>}
             </div>
           <div>
             <Tooltip title="立即运行">
@@ -127,6 +157,15 @@ export default class TaskManage extends Component {
                 icon={<CaretRightOutlined />}
                 style={{ marginRight: 8 }}
                 onClick={(e) => this.handleClickRun(e, taskName)}
+              ></Button>
+            </Tooltip>
+            <Tooltip title="修改任务">
+              <Button
+                type="primary"
+                shape="circle"
+                icon={<EditOutlined />}
+                style={{ marginRight: 8 }}
+                onClick={(e) => this.handleClickModify(e, taskInfo)}
               ></Button>
             </Tooltip>
             <Popconfirm
@@ -162,13 +201,27 @@ export default class TaskManage extends Component {
           </div>
         </div>,
         children: <div>
-          <div>任务类型：{displayInfo.taskType}</div>
-          { displayInfo.taskType === TASK_TYPE.SCRIPT_TASK && <div>脚本名称：{displayInfo.scriptName}</div>}
-          <div>执行计划：{displayInfo.executeSchedule}</div>
-          { !taskFinished && <div>下次执行时间：{displayInfo.nextExecuteTime}</div>}
-          <div>上次执行时间：{displayInfo.lastExecuteTime}</div>
-          <div>成功次数：{displayInfo.successNum}</div>
-          <div>失败次数：{displayInfo.failNum}</div>
+          <Row>
+            <Col span={12}><div>任务名称：{displayInfo.taskName}</div></Col>
+            <Col span={12}><div>任务类型：{displayInfo.taskType}</div></Col>
+          </Row>
+          {displayInfo.taskType === TASK_TYPE.REMIND_TASK && 
+            <Row>
+              <Col span={12}><div>弹窗位置：{displayInfo.reminderLocation ? displayInfo.reminderLocation : REMINDER_LOCATION.MIDDLE}</div></Col>
+              <Col span={12}><div>弹窗风格：{displayInfo.reminderStyle ? displayInfo.reminderStyle : REMINDER_STYLE[0]}</div></Col>
+            </Row>}
+          <Row>
+            <Col span={12}><div>执行计划：{displayInfo.executeSchedule}</div></Col>
+            <Col span={12}><div>执行脚本：{displayInfo.taskType === TASK_TYPE.SCRIPT_TASK ? displayInfo.scriptName : '🈚' }</div></Col>
+          </Row>
+          <Row>
+            <Col span={12}><div>上次执行时间：{displayInfo.lastExecuteTime}</div></Col>
+            <Col span={12}><div>下次执行时间：{taskFinished ? '🈚': displayInfo.nextExecuteTime}</div></Col>
+          </Row>
+          <Row>
+            <Col span={12}><div>成功次数：{displayInfo.successNum}</div></Col>
+            <Col span={12}><div>失败次数：{displayInfo.failNum}</div></Col>
+          </Row>
         </div>,
         showArrow: false,
       }
@@ -181,8 +234,8 @@ export default class TaskManage extends Component {
     this.setState(option)
   }
 
-  handleClickNewPlan = () => {
-    this.setState({ showNewPlan: true });
+  handleClickNewPlan = (taskType) => {
+    this.setState({ showNewPlan: true, taskType, mode: 'add', taskInfo: {} });
   }
 
   // 任务查询
@@ -196,6 +249,12 @@ export default class TaskManage extends Component {
     services.removeTask(taskName);
     this.refreshPage();
     message.success(`删除任务成功`);
+  }
+
+  handleClickModify = (e, taskInfo) => {
+    this.setState({ taskType: taskInfo.taskType, showNewPlan: true, mode: 'update', taskInfo})
+    e.stopPropagation();
+
   }
 
   handleClickRun = (e, taskName) => {
@@ -220,9 +279,9 @@ export default class TaskManage extends Component {
             <div className="small-font">管理你的执行计划</div>
           </div>
           <div>
-            <Button type="primary" style={{marginRight: '10px'}} onClick={this.handleClickRefresh}>刷新列表</Button>
-            {/* <Button type="primary" style={{marginRight: '10px'}} onClick={this.handleClickQueryPlan}>查询任务</Button> */}
-            <Button type="primary" onClick={this.handleClickNewPlan}>新建任务</Button>
+            <Button type="primary" icon={<RedoOutlined />} style={{marginRight: '10px'}} onClick={this.handleClickRefresh}>刷新列表</Button>
+            <Button type="primary" icon={<PlusCircleOutlined />} style={{marginRight: '10px'}} onClick={() => this.handleClickNewPlan(TASK_TYPE.REMIND_TASK)}>提醒任务</Button>
+            <Button type="primary" icon={<PlusCircleOutlined />} onClick={() => this.handleClickNewPlan(TASK_TYPE.SCRIPT_TASK)}>脚本任务</Button>
           </div>
         </div>
         {this.state.showNewPlan &&
@@ -230,14 +289,15 @@ export default class TaskManage extends Component {
             closeNewPlan={this.closeNewPlan}
             refreshPage={this.refreshPage}
             updateParentState={this.updateState}
+            taskType={this.state.taskType}
+            mode={this.state.mode}
+            taskInfo={this.state.taskInfo}
           >
           </AddTaskCard>}
-        {/* <div className="taskList">
-          {this.renderTaskList()}
-        </div> */}
         <Collapse 
           style={{margin: '5px'}}
-          items={this.state.items} 
+          items={this.state.items}
+          accordion="true"
         />
       </div>
     )

@@ -90,27 +90,42 @@
 }
 
 
-  /* 自定义类名：固定高度 + 适配 utools */
-  .modal-fixed-height .ant-modal-content {
-    height: 400px !important; /* 固定高度（适配 utools 小窗口） */
-    width: 400px !important; /* 配合宽度，避免比例失调 */
-    border-radius: 16px !important; /* 可选：保留圆角 */
-    overflow: hidden !important; /* 隐藏外层溢出 */
-    padding: 0%;
-  }
-  /* 内容区：超出高度时滚动 */
-  .modal-fixed-height .ant-modal-body {
-    height: calc(100% - 70px) !important; /* 扣除按钮区高度 */
-    overflow-y: auto !important; /* 垂直滚动 */
-    padding: 24px !important;
-  }
-  /* 按钮区：居中（延续之前的需求） */
-  .modal-fixed-height .ant-modal-footer {
-    justify-content: center !important;
-    margin-right: 0 !important;
-    padding: 12px 0 !important;
-  }
-  /* 隐藏标题（可选） */
-  .modal-fixed-height .ant-modal-header {
-    display: none !important;
-  }
+//   /* 自定义类名：固定高度 + 适配 utools */
+//   .modal-fixed-height .ant-modal-content {
+//     height: 400px !important; /* 固定高度（适配 utools 小窗口） */
+//     width: 400px !important; /* 配合宽度，避免比例失调 */
+//     border-radius: 16px !important; /* 可选：保留圆角 */
+//     overflow: hidden !important; /* 隐藏外层溢出 */
+//     padding: 0%;
+//   }
+//   /* 内容区：超出高度时滚动 */
+//   .modal-fixed-height .ant-modal-body {
+//     height: calc(100% - 70px) !important; /* 扣除按钮区高度 */
+//     overflow-y: auto !important; /* 垂直滚动 */
+//     padding: 24px !important;
+//   }
+//   /* 按钮区：居中（延续之前的需求） */
+//   .modal-fixed-height .ant-modal-footer {
+//     justify-content: center !important;
+//     margin-right: 0 !important;
+//     padding: 12px 0 !important;
+//   }
+//   /* 隐藏标题（可选） */
+//   .modal-fixed-height .ant-modal-header {
+//     display: none !important;
+//   }
+
+.uniform-container {
+    display: flex; /* 开启 Flex 布局 */
+    justify-content: space-between; /* 两端对齐，中间空白均分 */
+    align-items: center; /* 垂直居中（可选，让元素在容器垂直方向居中） */
+    width: 100%; /* 容器宽度，可自定义（如 500px） */
+    padding: 0 10px; /* 左右内边距，避免元素贴边 */
+    box-sizing: border-box; /* 内边距计入宽度，避免容器溢出 */
+}
+
+.uniform-item {
+    text-align: left; /* 文字/内联元素左对齐 */
+    width: auto; /* 宽度自适应内容（也可设固定宽度，如 200px） */
+    padding: 8px 12px;
+}

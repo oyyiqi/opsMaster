@@ -38,7 +38,7 @@ class OpsMaster extends Component {
     console.log('已存储数据:', allDocs);
     // this.clearAllData();
     window.services.resignTask();
-    window.services.clearRealTimeLog();
+    window.services.changeSystemDate();
     window.customEvents.addEvent("swichMenu", this.handleSwichMenuEvent);
   }
 
@@ -69,7 +69,7 @@ class OpsMaster extends Component {
     const { selectedKey } = this.state;
     return (
       <Layout style={{ minHeight: "100vh" }}>
-        <Sider width={180}>
+        <Sider width={150}>
           <Menu
             theme="dark"
             mode="inline"

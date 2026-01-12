@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hydration Check</title>
+    <style>
+      /* Base Reset & Layout */
+      html,
+      body {
+        margin: 0; /* 清除默认外边距，消除留白 */
+        padding: 0; /* 清除默认内边距，可选 */
+        height: 100%; /* 让 html/body 高度等于视口高度（关键） */
+        width: 100%; /* 让 html/body 宽度等于视口宽度，可选（块级元素默认 width: 100%） */
+        box-sizing: border-box; /* 避免 padding/border 撑破元素，可选优化 */
+        -webkit-app-region: drag;
+      }
+      button {
+        border: none;
+        background: none;
+        outline: none;
+        font-family: inherit;
+        -webkit-app-region: no-drag;
+      }
+
+      /* Utilities */
+      .hover-opacity:hover {
+        opacity: 0.7;
+      }
+      .hover-scale:hover {
+        transform: scale(1.05) !important;
+      }
+      .hover-white:hover {
+        color: #ffffff !important;
+      }
+
+      /* Neo Pop Button Interaction */
+      .neo-btn:active {
+        transform: translateY(2px);
+        box-shadow: 0px 0px 0px 0px #000 !important;
+      }
+
+      /* Glass Button Interaction */
+      .glass-btn:hover {
+        background-color: rgba(255, 255, 255, 0.25) !important;
+      }
+      .glass-btn:active {
+        transform: scale(0.98);
+      }
+
+      /* Cyberpunk Interactions */
+      .hover-cyan:hover {
+        color: #22d3ee !important;
+        text-shadow: 0 0 8px #22d3ee;
+      }
+      .cyber-btn:hover {
+        background-color: rgba(6, 182, 212, 0.2) !important;
+        box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+      }
+
+      /* iOS Interactions */
+      .hover-bg-gray:hover {
+        background-color: rgba(0, 0, 0, 0.05) !important;
+      }
+
+      /* Animations */
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <style>
+      .sd-card {
+        height: 100%;
+        width: 100%;
+        box-sizing: border-box;
+        background-color: #1c1c1e;
+        color: #fff;
+        border-radius: 24px;
+        padding: 40px 24px;
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        position: relative;
+        overflow: hidden;
+      }
+      .sd-close {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        color: #555;
+        cursor: pointer;
+        background: transparent;
+        border: none;
+      }
+      .sd-close:hover {
+        color: #fff;
+      }
+      .sd-icon-wrapper {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 50%;
+        margin-bottom: 24px;
+      }
+      .sd-title {
+        font-size: 24px;
+        font-weight: 700;
+        margin: 0 0 32px 0;
+        line-height: 1.2;
+      }
+      .sd-btn {
+        width: 100%;
+        background-color: #0a84ff;
+        color: white;
+        border: none;
+        padding: 14px;
+        border-radius: 14px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+      .sd-btn:hover {
+        background-color: #007aff;
+      }
+      .sd-btn:active {
+        transform: scale(0.98);
+      }
+      /* 给 SVG 图标添加蓝色背景样式 */
+    .lucide.lucide-alarm-clock-icon.lucide-alarm-clock {
+      /* 核心：设置蓝色背景（可自定义色值） */
+      /* 可选：圆形背景（匹配图标形状，避免方形背景生硬） */
+      border-radius: 50%; /* 完全圆形，与 SVG 内部圆圈匹配 */
+      /* 可选：调整内边距，让背景与图标之间有留白，更美观 */
+      padding: 15px; /* 留白大小可自定义 */
+      /* 可选：修改图标颜色为白色，与蓝色背景形成对比，更醒目 */
+      color:  #007aff; /* SVG 的 stroke="currentColor" 会继承该颜色 */
+    }
+    </style>
+    <div class="sd-card">
+      <div class="sd-icon-wrapper">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="64"
+          height="64"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="lucide lucide-alarm-clock-icon lucide-alarm-clock"
+        >
+          <circle cx="12" cy="13" r="8" />
+          <path d="M12 9v4l2 2" />
+          <path d="M5 3 2 6" />
+          <path d="m22 6-3-3" />
+          <path d="M6.38 18.7 4 21" />
+          <path d="M17.64 18.67 20 21" />
+        </svg>
+      </div>
+      <h2 class="sd-title" id="taskName">Hydration Check</h2>
+      <button class="sd-btn" id="closeButton">知道了</button>
+    </div>
+    <script>
+      document.getElementById("closeButton").addEventListener("click", () => {
+        window.close();
+      });
+      // 解析URL中的查询参数
+      function getUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        console.log(params);
+        return {
+          taskName: params.get("taskName"), // 获取div内容参数
+        };
+      }
+
+      // 页面加载后，设置div内容
+      window.onload = () => {
+        const params = getUrlParams();
+        const element = document.getElementById("taskName");
+        // 将传递的参数设置为div的内容
+        element.innerText = params.taskName;
+      };
+    </script>
+  </body>
+</html>

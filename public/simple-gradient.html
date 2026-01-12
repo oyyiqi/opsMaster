@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hydration Check</title>
     <style>
-      /* Base Reset & Layout */
-      body {
-        margin: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        background: transparent; /* 必须透明，否则看不到圆角以外的部分 */
+      /* 核心重置：清除默认边距，让 html/body 支撑起视口高度 */
+      html, body {
+        margin: 0; /* 清除默认外边距，消除留白 */
+        padding: 0; /* 清除默认内边距，可选 */
+        height: 100%; /* 让 html/body 高度等于视口高度（关键） */
+        width: 100%; /* 让 html/body 宽度等于视口宽度，可选（块级元素默认 width: 100%） */
+        box-sizing: border-box; /* 避免 padding/border 撑破元素，可选优化 */
+        /* background: transparent; */
       }
 
       button {
@@ -78,8 +78,9 @@
   <body>
     <style>
       .sg-card {
+        height: 100%; 
         width: 100%;
-        height: max-content;
+        box-sizing: border-box;
         background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
         border-radius: 28px;
         padding: 40px 24px;
@@ -87,8 +88,8 @@
         text-align: center;
         font-family: sans-serif;
         position: relative;
-        /* -webkit-app-region: drag; /* 允许拖动卡片移动窗口 */
         text-align: center;
+        -webkit-app-region: drag; /* 允许拖动卡片移动窗口 */
       }
       .sg-icon {
         margin-bottom: 24px;

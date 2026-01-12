@@ -5,12 +5,17 @@ export const SCRIPT_TYPE = [
   {type: 'shell', abbreviation: 'sh'},
 ]
 
-// export const APP_FUNCS = [
-//   {funcId: 'dataPanel', funcName: '数据面板'},
-//   {funcId: 'scriptManage', funcName: '脚本管理'},
-//   {funcId: 'taskManage', funcName: '任务管理'},
-//   {funcId: 'logManage', funcName: '日志管理'},
-// ]
+export const REMINDER_LOCATION = {
+  MIDDLE: '中间',
+  LEFT_TOP: '左上',
+  RIGHT_TOP: '右上',
+  MIDDLE_TOP: '中上',
+  LEFT_BOTTOM: '左下',
+  RIGHT_BOTTOM: '右下',
+  MIDDLE_BOTTOM: '中下',
+}
+
+export const REMINDER_STYLE = ['simple-gradient', 'simple-dark', 'simple-light']
 
 export const TASK_TYPE = {
   REMIND_TASK: '提醒任务',

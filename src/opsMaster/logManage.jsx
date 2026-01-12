@@ -1,5 +1,5 @@
 import { Row, Col, Select, Input, Layout, Flex, Button, Tooltip, Switch, message, Radio } from "antd";
-import { Component } from "react";
+import React, { Component } from "react";
 import "./dark.less";
 import "./common.less";
 import { Content } from "antd/es/layout/layout";
@@ -23,6 +23,7 @@ export default class LogManage extends Component {
       realTimeLog: '',
       logType: LOG_TYPE.REAL_TIME_LOG,
     }
+    this.areaTextRef = React.createRef();
   }
 
   componentDidMount() {
@@ -34,6 +35,7 @@ export default class LogManage extends Component {
   }
 
   init = () => {
+    const {textArea } = this.areaTextRef.current.resizableTextArea
     const defaultDateList = services.queryLogDateList();
     const defaultTaskList = services.queryTaskList();
     const realTimeLog = services.queryRealTimeLog();
@@ -44,6 +46,8 @@ export default class LogManage extends Component {
       dateList: defaultDateList,
       taskList: defaultTaskList,
       realTimeLog
+    }, () => {
+      textArea.scrollTop = textArea.scrollHeight;
     });
   }
 
@@ -84,19 +88,10 @@ export default class LogManage extends Component {
     this.setState({selectedTask: ''});
   }
 
-  // hadnleClickRealTimeRefresh = () => {
-  //   const {realTimeRefresh} = this.state;
-  //   if (realTimeRefresh) {
-  //     customEvents.removeEvent('realTimeLogUpdate', this.handleRealTimeLogUpdate);
-  //   } else {
-  //     customEvents.addEvent('realTimeLogUpdate', this.handleRealTimeLogUpdate);
-  //     message.info('监听事件realTimeLogUpdate')
-  //   }
-  //   this.setState({realTimeRefresh: !realTimeRefresh})
-  // }
-
   handleRealTimeLogUpdate = (realTimeLog) => {
+    const {textArea } = this.areaTextRef.current.resizableTextArea
     this.setState({ realTimeLog });
+    textArea.scrollTop = textArea.scrollHeight;
   }
 
   handleLogRadioChange = (e) => {
@@ -165,33 +160,10 @@ export default class LogManage extends Component {
               ))}
             </Select>
           </Col>
-          {/* <Col span={4}>
-            <div style={{display: 'flex'}}>
-              <Tooltip title={'查询'}>
-                <Button
-                  type="default"
-                  shape="circle"
-                  icon={<SearchOutlined />}
-                  style={{ marginRight: 8 }}
-                  onClick={(e) => this.handleClickRun(e, taskName)}
-                >
-                </Button>
-              </Tooltip>
-              <Tooltip title={realTimeRefresh ? "点击关闭实时刷新" : "点击打开实时刷新"}>
-                <Button
-                  type= {realTimeRefresh ? "primary" :"default"}
-                  shape="circle"
-                  icon={<UndoOutlined />}
-                  style={{ marginRight: 8 }}
-                  onClick={() => this.hadnleClickRealTimeRefresh()}
-                >
-                </Button>
-              </Tooltip>
-            </div>
-          </Col> */}
         </Row>}
         <TextArea
           className="codeViewer"
+          ref={this.areaTextRef}
           style={{
             height: "100%",
             border: '1px solid #1e293b',
