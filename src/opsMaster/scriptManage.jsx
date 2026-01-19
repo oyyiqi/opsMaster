@@ -44,6 +44,7 @@ export default class ScriptManage extends Component {
   }
 
   loadScripts = () => {
+    const { defaultSelectedScript } = this.props;
     const { items } = this.state;
     let scriptList = services.queryScriptList()
     if (!scriptList || scriptList.length === 0) {
@@ -55,7 +56,7 @@ export default class ScriptManage extends Component {
       // scriptInfo.abbreviation = SCRIPT_TYPE.filter((value) => value.type === scriptInfo.type)[0].abbreviation;
       items.push(scriptInfo);
     });
-    this.setState({ selectedItem: items[0], items });
+    this.setState({ selectedItem: defaultSelectedScript ? services.queryScriptInfo(defaultSelectedScript) : items[0], items });
   };
 
   handleClickScriptItem = (item) => {

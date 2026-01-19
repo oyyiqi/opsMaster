@@ -89,32 +89,6 @@
     padding: 0 !important;
 }
 
-
-//   /* 自定义类名：固定高度 + 适配 utools */
-//   .modal-fixed-height .ant-modal-content {
-//     height: 400px !important; /* 固定高度（适配 utools 小窗口） */
-//     width: 400px !important; /* 配合宽度，避免比例失调 */
-//     border-radius: 16px !important; /* 可选：保留圆角 */
-//     overflow: hidden !important; /* 隐藏外层溢出 */
-//     padding: 0%;
-//   }
-//   /* 内容区：超出高度时滚动 */
-//   .modal-fixed-height .ant-modal-body {
-//     height: calc(100% - 70px) !important; /* 扣除按钮区高度 */
-//     overflow-y: auto !important; /* 垂直滚动 */
-//     padding: 24px !important;
-//   }
-//   /* 按钮区：居中（延续之前的需求） */
-//   .modal-fixed-height .ant-modal-footer {
-//     justify-content: center !important;
-//     margin-right: 0 !important;
-//     padding: 12px 0 !important;
-//   }
-//   /* 隐藏标题（可选） */
-//   .modal-fixed-height .ant-modal-header {
-//     display: none !important;
-//   }
-
 .uniform-container {
     display: flex; /* 开启 Flex 布局 */
     justify-content: space-between; /* 两端对齐，中间空白均分 */
@@ -129,3 +103,29 @@
     width: auto; /* 宽度自适应内容（也可设固定宽度，如 200px） */
     padding: 8px 12px;
 }
+
+/* 1. 定义滚动条整体样式（webkit内核） */
+.ant-table-black-scrollbar .ant-table-content::-webkit-scrollbar {
+  width: 10px; /* 纵向滚动条宽度 */
+  height: 10px; /* 横向滚动条高度 */
+}
+
+/* 2. 定义滚动条滑块（黑色风格核心） */
+.ant-table-black-scrollbar .ant-table-content::-webkit-scrollbar-thumb {
+  background-color: #3e3a3a; /* 纯黑色滑块 */
+  border-radius: 4px;
+  /* 可选：添加边框与轨道区分更明显 */
+  border: 1px solid #3e3a3a;
+}
+
+/* 3. 定义滚动条轨道（可选，优化视觉效果） */
+.ant-table-black-scrollbar .ant-table-content::-webkit-scrollbar-track-piece {
+  background-color: #938c8c; /* 浅灰色轨道，与黑色滑块对比鲜明 */
+  border-radius: 4px; /* 轨道圆角，与滑块对应 */
+}
+
+/* 可选：滑块hover状态优化 */
+.ant-table-black-scrollbar .ant-table-content::-webkit-scrollbar-thumb:hover {
+  background-color: #333333; /* hover时深灰，提升交互体验 */
+}
+

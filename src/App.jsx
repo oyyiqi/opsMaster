@@ -32,7 +32,16 @@ class App extends Component {
     return (
       <ConfigProvider
         theme={{
-          algorithm: theme.darkAlgorithm
+          algorithm: theme.darkAlgorithm,
+          components: {
+            Table: {
+              colorBgContainer: '#080e20',
+              colorText: '#ffffff',
+              rowSelectedBg: '#121829',
+              rowSelectedHoverBg: '#121829',
+              headerBg: '#040917ff'
+            }
+          }
         }}
       >
         <OpsMaster defaultSelectedKey={route} />

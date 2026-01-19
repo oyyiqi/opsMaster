@@ -37,8 +37,8 @@ export const LOG_TYPE = {
 
 export const TASK_STATUS = {
   0: '就绪',
-  1: '运行中',
-  2: '已完成',
+  1: '运行',
+  2: '完成',
   3: '挂起',
 }
 

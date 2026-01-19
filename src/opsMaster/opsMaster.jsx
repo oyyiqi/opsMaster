@@ -10,6 +10,7 @@ import DataPanel from "./dataPanel";
 import LogManage from "./logManage";
 const { Sider } = Layout;
 
+let defaultSelectedScript = '';
 
 class OpsMaster extends Component {
 
@@ -17,6 +18,7 @@ class OpsMaster extends Component {
     super(props);
     this.state = {
       selectedKey: props.defaultSelectedKey,
+      defaultSelectedScript: '',
       showScriptManage: false,
       showTaskManage: false,
       showMessageBox: false,
@@ -46,8 +48,14 @@ class OpsMaster extends Component {
     window.customEvents.removeEvent("swichMenu", this.handleSwichMenuEvent);
   }
   
-  handleSwichMenuEvent = (key) => {
-    this.setState( { selectedKey: key});
+  handleSwichMenuEvent = (data) => {
+    console.log(data);
+    if (data.funcId === APP_FUNCS.SCRIPT_MANAGE) {
+      defaultSelectedScript = data.scriptName;
+      this.setState({selectedKey: data.funcId})
+    } else {
+      this.setState( { selectedKey: data.funcId });
+    }
   }
 
   clearAllData = () => {
@@ -59,6 +67,7 @@ class OpsMaster extends Component {
   }
 
   handleClickMenu = (item) => {
+    defaultSelectedScript = ''
     this.setState({selectedKey: item.key});
   };
   handleOnSelect = (e) => {
@@ -87,7 +96,7 @@ class OpsMaster extends Component {
           ></Menu>
         </Sider>
         {selectedKey === APP_FUNCS.DATA_PANEL && <DataPanel></DataPanel>}
-        {selectedKey === APP_FUNCS.SCRIPT_MANAGE  && <ScriptManage></ScriptManage>}
+        {selectedKey === APP_FUNCS.SCRIPT_MANAGE && <ScriptManage defaultSelectedScript={defaultSelectedScript}></ScriptManage>}
         {selectedKey === APP_FUNCS.TASK_MANAGE && <TaskManage></TaskManage>}
         {selectedKey === APP_FUNCS.LOG_MANAGE && <LogManage></LogManage>}
       </Layout>

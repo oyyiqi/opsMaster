@@ -171,6 +171,7 @@ window.services = {
   // 添加日志
   appendLog(taskName, content) {
     const date = moment(new Date()).format('YYYYMMDD');
+    const now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
     // 日志日期列表新增当前日期
     const logDates = this.queryLogDateList();
     if (!logDates.includes(date)) {
@@ -191,7 +192,7 @@ window.services = {
     }
     // 将日志内容追加写入到当前日期当前任务的日志中
     let currentLog = this.queryTargetTaskAndDateLog(taskName, date);
-    currentLog += content;
+    currentLog += `[${now}]: ${content}`
     setItem('log-' + taskName + '-' + date, currentLog);
     // 日志内容更新到实时日志中
     this.updateRealTimeLog(taskName, content);
